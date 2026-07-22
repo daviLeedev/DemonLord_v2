@@ -20,6 +20,10 @@ namespace DemonLord.Presentation
         private static readonly Color Warning = ColorFromHex("B73B3B");
         private static readonly Color Focus = ColorFromHex("78BFFF");
         private static readonly Color Crimson = ColorFromHex("762431");
+        private const string DeveloperLogoPath = "UI/Boot/logo_developer_white";
+        private const string BureauLogoPath = "UI/Boot/logo_world_adjustment_bureau";
+        private const string TitleLogoPath = "UI/Title/title_logo_ko";
+        private const string TitleBackgroundPath = "UI/Title/title_castle_ruins_background";
 
         private FrontendCoordinator coordinator;
         private ISceneFlowService sceneFlowService;
@@ -27,6 +31,7 @@ namespace DemonLord.Presentation
         private string selectedDifficultyId = DifficultyId.NormalValue;
         private int tutorialSelection;
         private bool titleCanSkip;
+        private int logoStage;
 
         public void Initialize(FrontendCoordinator coordinator, ISceneFlowService sceneFlowService)
         {
@@ -38,6 +43,13 @@ namespace DemonLord.Presentation
 
         private IEnumerator PlayOpeningSequence()
         {
+            logoStage = 0;
+            RenderLogoNotice();
+            yield return new WaitForSeconds(1.2f);
+            logoStage = 1;
+            RenderLogoNotice();
+            yield return new WaitForSeconds(1.2f);
+            logoStage = 2;
             RenderLogoNotice();
             yield return new WaitForSeconds(2.5f);
             coordinator.CompleteLogoNotice();
@@ -122,8 +134,20 @@ namespace DemonLord.Presentation
         {
             ClearContent();
             AddBackground(Iron);
-            AddLabel("세계중앙국 산하 삼계조정국", new Vector2(960f, 230f), 42, Focus, TextAnchor.MiddleCenter);
-            AddLabel("공식 기록 열람 승인", new Vector2(960f, 310f), 28, Paper, TextAnchor.MiddleCenter);
+            if (logoStage == 0)
+            {
+                AddRawImage(DeveloperLogoPath, new Vector2(960f, 480f), new Vector2(440f, 440f), Color.white);
+                return;
+            }
+
+            if (logoStage == 1)
+            {
+                AddRawImage(BureauLogoPath, new Vector2(960f, 490f), new Vector2(560f, 560f), Color.white);
+                return;
+            }
+
+            AddRawImage(BureauLogoPath, new Vector2(960f, 255f), new Vector2(270f, 270f), Color.white);
+            AddLabel("공식 기록 열람 승인", new Vector2(960f, 420f), 28, Paper, TextAnchor.MiddleCenter);
             AddPanel(new Vector2(960f, 580f), new Vector2(960f, 340f), new Color(0f, 0f, 0f, 0.48f));
             AddLabel("본 게임에는 섬광, 화면 흔들림, 갑작스러운 음향 및\n빠른 카메라 이동이 포함되어 있습니다.\n\n불편함이 느껴질 경우 플레이를 중단하거나,\n환경 조정의 접근성 항목에서 효과 강도를 낮춰 주십시오.\n\n저장 아이콘이 표시되는 동안 게임을 종료하지 마십시오.", new Vector2(960f, 580f), 27, Paper, TextAnchor.MiddleCenter);
         }
@@ -131,18 +155,19 @@ namespace DemonLord.Presentation
         private void RenderTitleIntro()
         {
             ClearContent();
-            AddBackground(new Color(0.055f, 0.06f, 0.08f, 1f));
-            AddPanel(new Vector2(960f, 500f), new Vector2(1100f, 560f), new Color(0f, 0f, 0f, 0.42f));
+            AddRawImage(TitleBackgroundPath, new Vector2(960f, 540f), new Vector2(1920f, 1080f), Color.white);
+            AddPanel(new Vector2(960f, 540f), new Vector2(1920f, 1080f), new Color(0f, 0f, 0f, 0.22f));
             AddLabel("AURA-RD-0417", new Vector2(960f, 300f), 25, Focus, TextAnchor.MiddleCenter);
-            AddLabel("공식 기록 열람 승인", new Vector2(960f, 390f), 38, Paper, TextAnchor.MiddleCenter);
+            AddRawImage(TitleLogoPath, new Vector2(960f, 545f), new Vector2(1180f, 664f), Color.white);
             AddButton("아무 버튼이나 누르십시오", new Vector2(960f, 760f), new Vector2(430f, 64f), CompleteTitleIntro, true);
         }
 
         private void RenderMainMenu()
         {
-            AddBackground(Iron);
-            AddLabel("공식 기록 열람", new Vector2(380f, 170f), 42, Paper, TextAnchor.MiddleLeft);
-            AddLabel("마왕성 제107관리구역", new Vector2(380f, 220f), 23, Focus, TextAnchor.MiddleLeft);
+            AddRawImage(TitleBackgroundPath, new Vector2(960f, 540f), new Vector2(1920f, 1080f), Color.white);
+            AddPanel(new Vector2(390f, 540f), new Vector2(780f, 1080f), new Color(Iron.r, Iron.g, Iron.b, 0.83f));
+            AddRawImage(TitleLogoPath, new Vector2(390f, 175f), new Vector2(600f, 338f), Color.white);
+            AddLabel("마왕성 제107관리구역", new Vector2(390f, 330f), 23, Focus, TextAnchor.MiddleCenter);
             AddMenuButton("01  최근 기록 이어보기   CONTINUE", 360f, BeginContinue);
             AddMenuButton("02  신규 파견 시작       NEW GAME", 440f, BeginNewGame);
             AddMenuButton("03  보존 기록 열람       LOAD GAME", 520f, BeginLoadGame);
@@ -370,6 +395,22 @@ namespace DemonLord.Presentation
             panel.transform.SetParent(contentRoot, false);
             ConfigureRect(panel.GetComponent<RectTransform>(), position, size);
             panel.GetComponent<Image>().color = color;
+        }
+
+        private void AddRawImage(string resourcePath, Vector2 position, Vector2 size, Color color)
+        {
+            Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+            if (texture == null)
+            {
+                return;
+            }
+
+            GameObject imageObject = new GameObject("RawImage", typeof(RawImage));
+            imageObject.transform.SetParent(contentRoot, false);
+            ConfigureRect(imageObject.GetComponent<RectTransform>(), position, size);
+            RawImage image = imageObject.GetComponent<RawImage>();
+            image.texture = texture;
+            image.color = color;
         }
 
         private void AddLabel(string value, Vector2 position, int fontSize, Color color, TextAnchor alignment)
