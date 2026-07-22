@@ -19,7 +19,7 @@ namespace DemonLord.Presentation
         private static readonly Color Iron = ColorFromHex("171A20");
         private static readonly Color Warning = ColorFromHex("B73B3B");
         private static readonly Color Focus = ColorFromHex("78BFFF");
-        private static readonly Color Crimson = ColorFromHex("762431");
+        private static readonly Color MenuRow = ColorFromHex("101722");
         private const string DeveloperLogoPath = "UI/Boot/logo_developer_white_transparent";
         private const string BureauLogoPath = "UI/Boot/logo_world_adjustment_bureau_transparent";
         private const string TitleLogoPath = "UI/Title/title_logo_ko_transparent";
@@ -348,6 +348,7 @@ namespace DemonLord.Presentation
         {
             GameObject button = AddButton(label, new Vector2(540f, y), new Vector2(620f, 64f), action, true, 86f);
             AddButtonIcon(button.transform, iconResourcePath, new Vector2(54f, 54f), new Vector2(44f, 0f));
+            AddMenuAccent(button.transform);
         }
 
         private void ShowUnavailable()
@@ -445,9 +446,16 @@ namespace DemonLord.Presentation
             buttonObject.transform.SetParent(contentRoot, false);
             ConfigureRect(buttonObject.GetComponent<RectTransform>(), position, size);
             Image image = buttonObject.GetComponent<Image>();
-            image.color = interactable ? new Color(Crimson.r, Crimson.g, Crimson.b, 0.68f) : new Color(0.25f, 0.25f, 0.25f, 0.6f);
+            image.color = interactable ? new Color(MenuRow.r, MenuRow.g, MenuRow.b, 0.62f) : new Color(0.25f, 0.25f, 0.25f, 0.6f);
             Button button = buttonObject.GetComponent<Button>();
             button.interactable = interactable;
+            ColorBlock colors = button.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(0.72f, 0.9f, 1f, 1f);
+            colors.pressedColor = new Color(0.48f, 0.72f, 0.9f, 1f);
+            colors.selectedColor = colors.highlightedColor;
+            colors.fadeDuration = 0.08f;
+            button.colors = colors;
             button.onClick.AddListener(action);
             AddButtonLabel(buttonObject.transform, value, interactable ? Paper : new Color(Paper.r, Paper.g, Paper.b, 0.4f), labelLeftPadding);
             return buttonObject;
@@ -489,6 +497,21 @@ namespace DemonLord.Presentation
             RawImage image = iconObject.GetComponent<RawImage>();
             image.texture = texture;
             image.raycastTarget = false;
+        }
+
+        private static void AddMenuAccent(Transform parent)
+        {
+            GameObject accentObject = new GameObject("MenuAccent", typeof(Image));
+            accentObject.transform.SetParent(parent, false);
+            RectTransform rect = accentObject.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(3f, 0f);
+            Image accent = accentObject.GetComponent<Image>();
+            accent.color = new Color(Focus.r, Focus.g, Focus.b, 0.88f);
+            accent.raycastTarget = false;
         }
 
         private static void ConfigureRect(RectTransform rect, Vector2 position, Vector2 size)
