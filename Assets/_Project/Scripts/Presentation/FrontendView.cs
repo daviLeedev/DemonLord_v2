@@ -20,9 +20,9 @@ namespace DemonLord.Presentation
         private static readonly Color Warning = ColorFromHex("B73B3B");
         private static readonly Color Focus = ColorFromHex("78BFFF");
         private static readonly Color Crimson = ColorFromHex("762431");
-        private const string DeveloperLogoPath = "UI/Boot/logo_developer_white";
-        private const string BureauLogoPath = "UI/Boot/logo_world_adjustment_bureau";
-        private const string TitleLogoPath = "UI/Title/title_logo_ko";
+        private const string DeveloperLogoPath = "UI/Boot/logo_developer_white_transparent";
+        private const string BureauLogoPath = "UI/Boot/logo_world_adjustment_bureau_transparent";
+        private const string TitleLogoPath = "UI/Title/title_logo_ko_transparent";
         private const string TitleBackgroundPath = "UI/Title/title_castle_ruins_background";
 
         private FrontendCoordinator coordinator;
