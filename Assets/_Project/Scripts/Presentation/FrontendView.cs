@@ -55,6 +55,14 @@ namespace DemonLord.Presentation
 
         private void CreateCanvas()
         {
+            GameObject cameraObject = new GameObject("FrontendBackgroundCamera", typeof(Camera));
+            cameraObject.transform.SetParent(transform, false);
+            Camera backgroundCamera = cameraObject.GetComponent<Camera>();
+            backgroundCamera.clearFlags = CameraClearFlags.SolidColor;
+            backgroundCamera.backgroundColor = Iron;
+            backgroundCamera.cullingMask = 0;
+            backgroundCamera.depth = -100f;
+
             GameObject canvasObject = new GameObject("FrontendCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasObject.transform.SetParent(transform, false);
             Canvas canvas = canvasObject.GetComponent<Canvas>();
