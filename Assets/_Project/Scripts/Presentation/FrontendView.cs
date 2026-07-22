@@ -24,6 +24,15 @@ namespace DemonLord.Presentation
         private const string BureauLogoPath = "UI/Boot/logo_world_adjustment_bureau_transparent";
         private const string TitleLogoPath = "UI/Title/title_logo_ko_transparent";
         private const string TitleBackgroundPath = "UI/Title/title_castle_ruins_background";
+        private const string ContinueIconPath = "UI/Menu/continue_transparent";
+        private const string NewGameIconPath = "UI/Menu/new_game_transparent";
+        private const string LoadGameIconPath = "UI/Menu/load_game_transparent";
+        private const string SettingsIconPath = "UI/Menu/settings_transparent";
+        private const string ArchiveIconPath = "UI/Menu/archive_transparent";
+        private const string ExitIconPath = "UI/Menu/exit_transparent";
+        private const string StoryDifficultyIconPath = "UI/Difficulty/story_transparent";
+        private const string NormalDifficultyIconPath = "UI/Difficulty/normal_transparent";
+        private const string HardDifficultyIconPath = "UI/Difficulty/hard_transparent";
 
         private FrontendCoordinator coordinator;
         private ISceneFlowService sceneFlowService;
@@ -168,12 +177,12 @@ namespace DemonLord.Presentation
             AddPanel(new Vector2(390f, 540f), new Vector2(780f, 1080f), new Color(Iron.r, Iron.g, Iron.b, 0.83f));
             AddRawImage(TitleLogoPath, new Vector2(390f, 175f), new Vector2(600f, 338f), Color.white);
             AddLabel("마왕성 제107관리구역", new Vector2(390f, 330f), 23, Focus, TextAnchor.MiddleCenter);
-            AddMenuButton("01  최근 기록 이어보기   CONTINUE", 360f, BeginContinue);
-            AddMenuButton("02  신규 파견 시작       NEW GAME", 440f, BeginNewGame);
-            AddMenuButton("03  보존 기록 열람       LOAD GAME", 520f, BeginLoadGame);
-            AddMenuButton("04  환경 조정            SETTINGS", 600f, ShowUnavailable);
-            AddMenuButton("05  기록 보관소          ARCHIVE", 680f, ShowUnavailable);
-            AddMenuButton("06  업무 종료            EXIT", 760f, ExitApplication);
+            AddMenuButton("01  최근 기록 이어보기   CONTINUE", ContinueIconPath, 360f, BeginContinue);
+            AddMenuButton("02  신규 파견 시작       NEW GAME", NewGameIconPath, 440f, BeginNewGame);
+            AddMenuButton("03  보존 기록 열람       LOAD GAME", LoadGameIconPath, 520f, BeginLoadGame);
+            AddMenuButton("04  환경 조정            SETTINGS", SettingsIconPath, 600f, ShowUnavailable);
+            AddMenuButton("05  기록 보관소          ARCHIVE", ArchiveIconPath, 680f, ShowUnavailable);
+            AddMenuButton("06  업무 종료            EXIT", ExitIconPath, 760f, ExitApplication);
         }
 
         private void RenderSaveSlots()
@@ -199,9 +208,9 @@ namespace DemonLord.Presentation
             AddLabel("신규 파견 등록", new Vector2(960f, 115f), 40, Paper, TextAnchor.MiddleCenter);
             AddLabel("담당자: 신입 세무관   /   파견 지역: 마왕성 제107관리구역", new Vector2(960f, 165f), 22, Focus, TextAnchor.MiddleCenter);
             AddLabel("난이도 선택", new Vector2(510f, 285f), 30, Paper, TextAnchor.MiddleCenter);
-            AddDifficultyButton("기록 열람  STORY", DifficultyId.StoryValue, 390f);
-            AddDifficultyButton("정규 파견  NORMAL", DifficultyId.NormalValue, 490f);
-            AddDifficultyButton("특별 압류  HARD", DifficultyId.HardValue, 590f);
+            AddDifficultyButton("기록 열람  STORY", DifficultyId.StoryValue, StoryDifficultyIconPath, 390f);
+            AddDifficultyButton("정규 파견  NORMAL", DifficultyId.NormalValue, NormalDifficultyIconPath, 490f);
+            AddDifficultyButton("특별 압류  HARD", DifficultyId.HardValue, HardDifficultyIconPath, 590f);
             AddLabel("튜토리얼", new Vector2(1370f, 285f), 30, Paper, TextAnchor.MiddleCenter);
             AddTutorialButton("상세 안내", 0, 390f);
             AddTutorialButton("핵심 안내", 1, 490f);
@@ -322,10 +331,11 @@ namespace DemonLord.Presentation
             }
         }
 
-        private void AddDifficultyButton(string label, string difficultyId, float y)
+        private void AddDifficultyButton(string label, string difficultyId, string iconResourcePath, float y)
         {
             string displayLabel = (selectedDifficultyId == difficultyId ? "▶ " : "   ") + label;
-            AddButton(displayLabel, new Vector2(510f, y), new Vector2(500f, 72f), () => { selectedDifficultyId = difficultyId; Render(); }, true);
+            GameObject button = AddButton(displayLabel, new Vector2(510f, y), new Vector2(500f, 84f), () => { selectedDifficultyId = difficultyId; Render(); }, true, 108f);
+            AddButtonIcon(button.transform, iconResourcePath, new Vector2(78f, 78f), new Vector2(48f, 0f));
         }
 
         private void AddTutorialButton(string label, int value, float y)
@@ -334,9 +344,10 @@ namespace DemonLord.Presentation
             AddButton(displayLabel, new Vector2(1370f, y), new Vector2(380f, 72f), () => { tutorialSelection = value; Render(); }, true);
         }
 
-        private void AddMenuButton(string label, float y, UnityEngine.Events.UnityAction action)
+        private void AddMenuButton(string label, string iconResourcePath, float y, UnityEngine.Events.UnityAction action)
         {
-            AddButton(label, new Vector2(540f, y), new Vector2(620f, 64f), action, true);
+            GameObject button = AddButton(label, new Vector2(540f, y), new Vector2(620f, 64f), action, true, 86f);
+            AddButtonIcon(button.transform, iconResourcePath, new Vector2(54f, 54f), new Vector2(44f, 0f));
         }
 
         private void ShowUnavailable()
@@ -428,7 +439,7 @@ namespace DemonLord.Presentation
             text.verticalOverflow = VerticalWrapMode.Overflow;
         }
 
-        private void AddButton(string value, Vector2 position, Vector2 size, UnityEngine.Events.UnityAction action, bool interactable)
+        private GameObject AddButton(string value, Vector2 position, Vector2 size, UnityEngine.Events.UnityAction action, bool interactable, float labelLeftPadding = 18f)
         {
             GameObject buttonObject = new GameObject("Button", typeof(Image), typeof(Button));
             buttonObject.transform.SetParent(contentRoot, false);
@@ -438,17 +449,18 @@ namespace DemonLord.Presentation
             Button button = buttonObject.GetComponent<Button>();
             button.interactable = interactable;
             button.onClick.AddListener(action);
-            AddButtonLabel(buttonObject.transform, value, interactable ? Paper : new Color(Paper.r, Paper.g, Paper.b, 0.4f));
+            AddButtonLabel(buttonObject.transform, value, interactable ? Paper : new Color(Paper.r, Paper.g, Paper.b, 0.4f), labelLeftPadding);
+            return buttonObject;
         }
 
-        private static void AddButtonLabel(Transform parent, string value, Color color)
+        private static void AddButtonLabel(Transform parent, string value, Color color, float leftPadding)
         {
             GameObject label = new GameObject("Text", typeof(Text));
             label.transform.SetParent(parent, false);
             RectTransform rect = label.GetComponent<RectTransform>();
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;
-            rect.offsetMin = new Vector2(18f, 6f);
+            rect.offsetMin = new Vector2(leftPadding, 6f);
             rect.offsetMax = new Vector2(-18f, -6f);
             Text text = label.GetComponent<Text>();
             text.text = value;
@@ -456,6 +468,27 @@ namespace DemonLord.Presentation
             text.fontSize = 22;
             text.color = color;
             text.alignment = TextAnchor.MiddleLeft;
+        }
+
+        private static void AddButtonIcon(Transform parent, string resourcePath, Vector2 size, Vector2 position)
+        {
+            Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+            if (texture == null)
+            {
+                return;
+            }
+
+            GameObject iconObject = new GameObject("Icon", typeof(RawImage));
+            iconObject.transform.SetParent(parent, false);
+            RectTransform rect = iconObject.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0f, 0.5f);
+            rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+            RawImage image = iconObject.GetComponent<RawImage>();
+            image.texture = texture;
+            image.raycastTarget = false;
         }
 
         private static void ConfigureRect(RectTransform rect, Vector2 position, Vector2 size)
