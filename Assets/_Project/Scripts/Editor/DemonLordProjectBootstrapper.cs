@@ -40,6 +40,8 @@ namespace DemonLord.Editor
         [InitializeOnLoadMethod]
         private static void ScheduleInitialFoundationSetup()
         {
+            EditorApplication.delayCall += EnsurePlayModeStartScene;
+
             if (SceneDefinitions.All(definition => File.Exists(definition.Path)) && HasExpectedBuildSettings())
             {
                 return;
@@ -69,6 +71,18 @@ namespace DemonLord.Editor
 
             AssetDatabase.SaveAssets();
             Debug.Log("DemonLord foundation scenes and build settings have been configured.");
+        }
+
+        [MenuItem("DemonLord/Bootstrap/Use Boot Scene for Play Mode")]
+        public static void EnsurePlayModeStartScene()
+        {
+            SceneAsset bootScene = AssetDatabase.LoadAssetAtPath<SceneAsset>(SceneDefinitions[0].Path);
+            if (bootScene == null)
+            {
+                return;
+            }
+
+            EditorSceneManager.playModeStartScene = bootScene;
         }
 
         [MenuItem("DemonLord/Bootstrap/Validate Foundation")]
