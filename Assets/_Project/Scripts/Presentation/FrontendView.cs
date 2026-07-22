@@ -15,6 +15,12 @@ namespace DemonLord.Presentation
 {
     public sealed class FrontendView : MonoBehaviour
     {
+        private enum UiButtonSound
+        {
+            Select,
+            Cancel
+        }
+
         private static readonly Color Paper = ColorFromHex("E7E2D8");
         private static readonly Color Iron = ColorFromHex("171A20");
         private static readonly Color Warning = ColorFromHex("B73B3B");
@@ -34,6 +40,12 @@ namespace DemonLord.Presentation
         private const string NormalDifficultyIconPath = "UI/Difficulty/normal_transparent";
         private const string HardDifficultyIconPath = "UI/Difficulty/hard_transparent";
         private const string FrontendMusicPath = "Audio/Bgm/frontend_ambient";
+        private const string FocusSoundPath = "Audio/Ui/ui_focus_01";
+        private const string SelectSoundPath = "Audio/Ui/ui_select_01";
+        private const string CancelSoundPath = "Audio/Ui/ui_cancel_01";
+        private const string DisabledSoundPath = "Audio/Ui/ui_disabled_01";
+        private const string ErrorSoundPath = "Audio/Ui/ui_error_01";
+        private const string SaveCompleteSoundPath = "Audio/Ui/ui_save_complete_01";
 
         private FrontendCoordinator coordinator;
         private ISceneFlowService sceneFlowService;
@@ -42,6 +54,13 @@ namespace DemonLord.Presentation
         private int tutorialSelection;
         private bool titleCanSkip;
         private int logoStage;
+        private AudioSource uiSoundSource;
+        private AudioClip focusSound;
+        private AudioClip selectSound;
+        private AudioClip cancelSound;
+        private AudioClip disabledSound;
+        private AudioClip errorSound;
+        private AudioClip saveCompleteSound;
 
         public void Initialize(FrontendCoordinator coordinator, ISceneFlowService sceneFlowService)
         {
@@ -106,6 +125,7 @@ namespace DemonLord.Presentation
             contentRoot.offsetMin = Vector2.zero;
             contentRoot.offsetMax = Vector2.zero;
             CreateBackgroundMusic();
+            CreateUiSoundPlayer();
         }
 
         private void CreateBackgroundMusic()
@@ -126,6 +146,30 @@ namespace DemonLord.Presentation
             source.spatialBlend = 0f;
             source.volume = 0.32f;
             source.Play();
+        }
+
+        private void CreateUiSoundPlayer()
+        {
+            GameObject soundObject = new GameObject("FrontendUiSounds", typeof(AudioSource));
+            soundObject.transform.SetParent(transform, false);
+            uiSoundSource = soundObject.GetComponent<AudioSource>();
+            uiSoundSource.playOnAwake = false;
+            uiSoundSource.spatialBlend = 0f;
+            uiSoundSource.volume = 0.58f;
+            focusSound = Resources.Load<AudioClip>(FocusSoundPath);
+            selectSound = Resources.Load<AudioClip>(SelectSoundPath);
+            cancelSound = Resources.Load<AudioClip>(CancelSoundPath);
+            disabledSound = Resources.Load<AudioClip>(DisabledSoundPath);
+            errorSound = Resources.Load<AudioClip>(ErrorSoundPath);
+            saveCompleteSound = Resources.Load<AudioClip>(SaveCompleteSoundPath);
+        }
+
+        private void PlayUiSound(AudioClip sound)
+        {
+            if (uiSoundSource != null && sound != null)
+            {
+                uiSoundSource.PlayOneShot(sound);
+            }
         }
 
         private void Render()
@@ -202,8 +246,8 @@ namespace DemonLord.Presentation
             AddMenuButton("01  최근 기록 이어보기   CONTINUE", ContinueIconPath, 360f, BeginContinue);
             AddMenuButton("02  신규 파견 시작       NEW GAME", NewGameIconPath, 440f, BeginNewGame);
             AddMenuButton("03  보존 기록 열람       LOAD GAME", LoadGameIconPath, 520f, BeginLoadGame);
-            AddMenuButton("04  환경 조정            SETTINGS", SettingsIconPath, 600f, ShowUnavailable);
-            AddMenuButton("05  기록 보관소          ARCHIVE", ArchiveIconPath, 680f, ShowUnavailable);
+            AddMenuButton("04  환경 조정            SETTINGS", SettingsIconPath, 600f, ShowUnavailable, false);
+            AddMenuButton("05  기록 보관소          ARCHIVE", ArchiveIconPath, 680f, ShowUnavailable, false);
             AddMenuButton("06  업무 종료            EXIT", ExitIconPath, 760f, ExitApplication);
         }
 
@@ -221,7 +265,7 @@ namespace DemonLord.Presentation
                 AddButton(body, new Vector2(960f, y), new Vector2(980f, 150f), () => SelectSlot(slot.SlotId), interactable);
                 y += 180f;
             }
-            AddButton("뒤로", new Vector2(220f, 960f), new Vector2(220f, 56f), Back, true);
+            AddButton("뒤로", new Vector2(220f, 960f), new Vector2(220f, 56f), Back, true, 18f, UiButtonSound.Cancel);
         }
 
         private void RenderNewGameSetup()
@@ -238,7 +282,7 @@ namespace DemonLord.Presentation
             AddTutorialButton("핵심 안내", 1, 490f);
             AddTutorialButton("사용 안 함", 2, 590f);
             AddButton("파견 승인", new Vector2(1240f, 850f), new Vector2(300f, 64f), CreateNewGame, true);
-            AddButton("뒤로", new Vector2(680f, 850f), new Vector2(300f, 64f), Back, true);
+            AddButton("뒤로", new Vector2(680f, 850f), new Vector2(300f, 64f), Back, true, 18f, UiButtonSound.Cancel);
         }
 
         private void RenderOverwriteConfirm()
@@ -248,7 +292,7 @@ namespace DemonLord.Presentation
             AddLabel("기존 기록 덮어쓰기", new Vector2(960f, 355f), 40, Warning, TextAnchor.MiddleCenter);
             AddLabel("이 슬롯에는 기존 보존 기록이 있습니다.\n\n신규 파견을 시작하면 해당 기록을 덮어쓰며,\n덮어쓴 기록은 복구할 수 없습니다.\n\n정말 신규 파견을 시작하시겠습니까?", new Vector2(960f, 535f), 27, Paper, TextAnchor.MiddleCenter);
             AddButton("기존 기록 덮어쓰기", new Vector2(700f, 760f), new Vector2(360f, 62f), () => ConfirmOverwrite(true), true);
-            AddButton("취소", new Vector2(1220f, 760f), new Vector2(220f, 62f), () => ConfirmOverwrite(false), true);
+            AddButton("취소", new Vector2(1220f, 760f), new Vector2(220f, 62f), () => ConfirmOverwrite(false), true, 18f, UiButtonSound.Cancel);
         }
 
         private void RenderError()
@@ -256,7 +300,7 @@ namespace DemonLord.Presentation
             AddBackground(Iron);
             AddLabel("기록 처리 오류", new Vector2(960f, 420f), 42, Warning, TextAnchor.MiddleCenter);
             AddLabel("처리할 수 없는 기록입니다.\n오류 코드: " + coordinator.ErrorCode, new Vector2(960f, 530f), 27, Paper, TextAnchor.MiddleCenter);
-            AddButton("돌아가기", new Vector2(960f, 680f), new Vector2(280f, 62f), Back, true);
+            AddButton("돌아가기", new Vector2(960f, 680f), new Vector2(280f, 62f), Back, true, 18f, UiButtonSound.Cancel);
         }
 
         private void RenderBusy()
@@ -308,10 +352,17 @@ namespace DemonLord.Presentation
             bool tutorialEnabled = tutorialSelection != 2;
             if (!NewGameSettings.TryCreate("세무관", selectedDifficultyId, tutorialEnabled, out NewGameSettings settings, out string errorCode))
             {
+                PlayUiSound(errorSound);
                 return;
             }
 
-            HandleCommand(coordinator.CreateSelectedNewGame(settings, UnityEngine.Application.version));
+            FrontendCommandResult result = coordinator.CreateSelectedNewGame(settings, UnityEngine.Application.version);
+            if (result.HasEntryDestination)
+            {
+                PlayUiSound(saveCompleteSound);
+            }
+
+            HandleCommand(result);
         }
 
         private void CompleteTitleIntro()
@@ -333,6 +384,11 @@ namespace DemonLord.Presentation
             {
                 StartCoroutine(LoadEntry(result.Destination));
                 return;
+            }
+
+            if (coordinator.Screen == FrontendScreen.ErrorDialog)
+            {
+                PlayUiSound(errorSound);
             }
 
             Render();
@@ -366,9 +422,9 @@ namespace DemonLord.Presentation
             AddButton(displayLabel, new Vector2(1370f, y), new Vector2(380f, 72f), () => { tutorialSelection = value; Render(); }, true);
         }
 
-        private void AddMenuButton(string label, string iconResourcePath, float y, UnityEngine.Events.UnityAction action)
+        private void AddMenuButton(string label, string iconResourcePath, float y, UnityEngine.Events.UnityAction action, bool interactable = true)
         {
-            GameObject button = AddButton(label, new Vector2(540f, y), new Vector2(620f, 64f), action, true, 86f);
+            GameObject button = AddButton(label, new Vector2(540f, y), new Vector2(620f, 64f), action, interactable, 86f);
             AddButtonIcon(button.transform, iconResourcePath, new Vector2(54f, 54f), new Vector2(44f, 0f));
             AddMenuAccent(button.transform);
         }
@@ -462,7 +518,14 @@ namespace DemonLord.Presentation
             text.verticalOverflow = VerticalWrapMode.Overflow;
         }
 
-        private GameObject AddButton(string value, Vector2 position, Vector2 size, UnityEngine.Events.UnityAction action, bool interactable, float labelLeftPadding = 18f)
+        private GameObject AddButton(
+            string value,
+            Vector2 position,
+            Vector2 size,
+            UnityEngine.Events.UnityAction action,
+            bool interactable,
+            float labelLeftPadding = 18f,
+            UiButtonSound clickSound = UiButtonSound.Select)
         {
             GameObject buttonObject = new GameObject("Button", typeof(Image), typeof(Button));
             buttonObject.transform.SetParent(contentRoot, false);
@@ -478,9 +541,50 @@ namespace DemonLord.Presentation
             colors.selectedColor = colors.highlightedColor;
             colors.fadeDuration = 0.08f;
             button.colors = colors;
+            button.onClick.AddListener(() => PlayUiSound(clickSound == UiButtonSound.Cancel ? cancelSound : selectSound));
             button.onClick.AddListener(action);
+            AddButtonEventSounds(buttonObject, interactable);
             AddButtonLabel(buttonObject.transform, value, interactable ? Paper : new Color(Paper.r, Paper.g, Paper.b, 0.4f), labelLeftPadding);
             return buttonObject;
+        }
+
+        private void AddButtonEventSounds(GameObject buttonObject, bool interactable)
+        {
+            EventTrigger eventTrigger = buttonObject.AddComponent<EventTrigger>();
+            eventTrigger.triggers = new List<EventTrigger.Entry>();
+            AddEventTriggerEntry(eventTrigger, EventTriggerType.PointerEnter, _ =>
+            {
+                if (interactable)
+                {
+                    PlayUiSound(focusSound);
+                }
+            });
+            AddEventTriggerEntry(eventTrigger, EventTriggerType.Select, _ =>
+            {
+                if (interactable)
+                {
+                    PlayUiSound(focusSound);
+                }
+            });
+
+            if (!interactable)
+            {
+                AddEventTriggerEntry(eventTrigger, EventTriggerType.PointerClick, _ => PlayUiSound(disabledSound));
+            }
+        }
+
+        private static void AddEventTriggerEntry(
+            EventTrigger eventTrigger,
+            EventTriggerType eventType,
+            UnityEngine.Events.UnityAction<BaseEventData> callback)
+        {
+            EventTrigger.Entry entry = new EventTrigger.Entry
+            {
+                eventID = eventType,
+                callback = new EventTrigger.TriggerEvent()
+            };
+            entry.callback.AddListener(callback);
+            eventTrigger.triggers.Add(entry);
         }
 
         private static void AddButtonLabel(Transform parent, string value, Color color, float leftPadding)
@@ -498,6 +602,7 @@ namespace DemonLord.Presentation
             text.fontSize = 22;
             text.color = color;
             text.alignment = TextAnchor.MiddleLeft;
+            text.raycastTarget = false;
         }
 
         private static void AddButtonIcon(Transform parent, string resourcePath, Vector2 size, Vector2 position)
