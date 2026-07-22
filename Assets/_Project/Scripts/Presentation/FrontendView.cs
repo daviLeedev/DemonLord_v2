@@ -26,6 +26,7 @@ namespace DemonLord.Presentation
         private static readonly Color Warning = ColorFromHex("B73B3B");
         private static readonly Color Focus = ColorFromHex("78BFFF");
         private static readonly Color MenuRow = ColorFromHex("101722");
+        private static readonly Color ButtonText = ColorFromHex("FFF0D0");
         private const string DeveloperLogoPath = "UI/Boot/logo_developer_white_transparent";
         private const string BureauLogoPath = "UI/Boot/logo_world_adjustment_bureau_transparent";
         private const string TitleLogoPath = "UI/Title/title_logo_ko_transparent";
@@ -434,7 +435,7 @@ namespace DemonLord.Presentation
                 panel.color = interactable ? Color.white : new Color(0.45f, 0.45f, 0.45f, 0.72f);
             }
 
-            AddButtonIcon(button.transform, iconResourcePath, new Vector2(82f, 82f), new Vector2(60f, 0f));
+            AddButtonIcon(button.transform, iconResourcePath, new Vector2(78f, 78f), new Vector2(70f, 0f));
         }
 
         private void ShowUnavailable()
@@ -552,7 +553,7 @@ namespace DemonLord.Presentation
             button.onClick.AddListener(() => PlayUiSound(clickSound == UiButtonSound.Cancel ? cancelSound : selectSound));
             button.onClick.AddListener(action);
             AddButtonEventSounds(buttonObject, interactable);
-            AddButtonLabel(buttonObject.transform, value, interactable ? Paper : new Color(Paper.r, Paper.g, Paper.b, 0.4f), labelLeftPadding);
+            AddButtonLabel(buttonObject.transform, value, interactable ? ButtonText : new Color(Paper.r, Paper.g, Paper.b, 0.4f), labelLeftPadding);
             return buttonObject;
         }
 
@@ -607,10 +608,17 @@ namespace DemonLord.Presentation
             Text text = label.GetComponent<Text>();
             text.text = value;
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 22;
+            text.fontSize = 25;
+            text.fontStyle = FontStyle.Bold;
             text.color = color;
             text.alignment = TextAnchor.MiddleLeft;
             text.raycastTarget = false;
+            Shadow shadow = label.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.95f);
+            shadow.effectDistance = new Vector2(2f, -2f);
+            Outline outline = label.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 0f, 0f, 0.88f);
+            outline.effectDistance = new Vector2(1f, -1f);
         }
 
         private static void AddButtonIcon(Transform parent, string resourcePath, Vector2 size, Vector2 position)
@@ -652,7 +660,8 @@ namespace DemonLord.Presentation
             rect.offsetMax = Vector2.zero;
             Image panel = panelObject.GetComponent<Image>();
             panel.sprite = sprite;
-            panel.type = Image.Type.Sliced;
+            panel.type = Image.Type.Simple;
+            panel.preserveAspect = true;
             panel.raycastTarget = false;
             return panel;
         }
