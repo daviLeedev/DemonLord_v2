@@ -51,13 +51,13 @@ namespace DemonLord.Bootstrap
                 new NoSaveMigrationPipeline());
             PlayerSession = new InMemoryPlayerSession();
             IEntryPointResolver entryPointResolver = new EntryPointResolver();
-            sceneFlowService = new UnitySceneFlowService(PlayerSession);
             FrontendCoordinator = new FrontendCoordinator(
                 new ListSaveSlotsUseCase(saveRepository),
                 new CreateNewGameUseCase(saveRepository, clock),
                 new LoadGameUseCase(saveRepository),
                 PlayerSession,
                 entryPointResolver);
+            sceneFlowService = new UnitySceneFlowService(PlayerSession, FrontendCoordinator);
         }
     }
 }

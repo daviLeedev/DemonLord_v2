@@ -12,15 +12,29 @@ namespace DemonLord.Bootstrap
         private const string FrontendSceneName = "10_Frontend";
         private const string GameShellSceneName = "90_GameShell";
         private readonly IPlayerSession playerSession;
+        private readonly FrontendCoordinator frontendCoordinator;
 
-        public UnitySceneFlowService(IPlayerSession playerSession)
+        public UnitySceneFlowService(IPlayerSession playerSession, FrontendCoordinator frontendCoordinator)
         {
             this.playerSession = playerSession ?? throw new ArgumentNullException(nameof(playerSession));
+            this.frontendCoordinator = frontendCoordinator ?? throw new ArgumentNullException(nameof(frontendCoordinator));
         }
 
-        public Task LoadFrontendAsync()
+        public async Task LoadFrontendAsync()
         {
-            return LoadSceneAsync(FrontendSceneName);
+            await LoadSceneAsync(FrontendSceneName);
+            Scene scene = SceneManager.GetActiveScene();
+            foreach (GameObject rootObject in scene.GetRootGameObjects())
+            {
+                FrontendView frontendView = rootObject.GetComponent<FrontendView>();
+                if (frontendView != null)
+                {
+                    frontendView.Initialize(frontendCoordinator, this);
+                    return;
+                }
+            }
+
+            throw new InvalidOperationException("FrontendView is missing from the Frontend scene.");
         }
 
         public async Task LoadEntryAsync(EntryDestination destination)

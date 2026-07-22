@@ -1,7 +1,9 @@
 {
   "name": "DemonLord.Runtime",
   "rootNamespace": "DemonLord",
-  "references": [],
+  "references": [
+    "UnityEngine.UI"
+  ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
