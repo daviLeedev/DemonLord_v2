@@ -3,13 +3,18 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.TestTools;
 
 namespace DemonLord.Editor
 {
     public static class DemonLordProjectBootstrapper
     {
+        private static TestRunnerApi testRunnerApi;
+        private static FoundationTestCallbacks testCallbacks;
+
         private static readonly string[] RequiredFolders =
         {
             "Assets/_Project/Art",
@@ -88,6 +93,28 @@ namespace DemonLord.Editor
             Debug.Log("DemonLord foundation validation passed.");
         }
 
+        [MenuItem("DemonLord/Bootstrap/Run EditMode Core Tests %#t")]
+        public static void RunEditModeCoreTests()
+        {
+            if (testCallbacks != null)
+            {
+                TestRunnerApi.UnregisterTestCallback(testCallbacks);
+            }
+
+            testRunnerApi = ScriptableObject.CreateInstance<TestRunnerApi>();
+            testCallbacks = new FoundationTestCallbacks();
+            testRunnerApi.RegisterCallbacks(testCallbacks);
+            testRunnerApi.Execute(new ExecutionSettings(
+                new Filter
+                {
+                    testMode = TestMode.EditMode,
+                    groupNames = new[] { "^DemonLord\\.Tests\\.EditMode\\." },
+                })
+            {
+                runSynchronously = true,
+            });
+        }
+
         private static bool HasExpectedBuildSettings()
         {
             string[] configuredScenePaths = EditorBuildSettings.scenes
@@ -123,6 +150,33 @@ namespace DemonLord.Editor
             public string Path { get; }
 
             public string RootObjectName { get; }
+        }
+
+        private sealed class FoundationTestCallbacks : ICallbacks
+        {
+            public void RunStarted(ITestAdaptor testsToRun)
+            {
+            }
+
+            public void RunFinished(ITestResultAdaptor result)
+            {
+                if (result.FailCount > 0)
+                {
+                    Debug.LogError(
+                        "DemonLord EditMode core tests failed. Failed=" + result.FailCount + ", Passed=" + result.PassCount + ".");
+                    return;
+                }
+
+                Debug.Log("DemonLord EditMode core tests passed. Passed=" + result.PassCount + ".");
+            }
+
+            public void TestStarted(ITestAdaptor test)
+            {
+            }
+
+            public void TestFinished(ITestResultAdaptor result)
+            {
+            }
         }
     }
 }

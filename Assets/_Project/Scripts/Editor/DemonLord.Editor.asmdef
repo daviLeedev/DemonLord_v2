@@ -2,7 +2,8 @@
   "name": "DemonLord.Editor",
   "rootNamespace": "DemonLord.Editor",
   "references": [
-    "DemonLord.Runtime"
+    "DemonLord.Runtime",
+    "UnityEditor.TestRunner"
   ],
   "includePlatforms": [
     "Editor"
