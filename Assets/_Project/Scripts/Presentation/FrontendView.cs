@@ -33,6 +33,7 @@ namespace DemonLord.Presentation
         private const string StoryDifficultyIconPath = "UI/Difficulty/story_transparent";
         private const string NormalDifficultyIconPath = "UI/Difficulty/normal_transparent";
         private const string HardDifficultyIconPath = "UI/Difficulty/hard_transparent";
+        private const string FrontendMusicPath = "Audio/Bgm/frontend_ambient";
 
         private FrontendCoordinator coordinator;
         private ISceneFlowService sceneFlowService;
@@ -76,7 +77,7 @@ namespace DemonLord.Presentation
 
         private void CreateCanvas()
         {
-            GameObject cameraObject = new GameObject("FrontendBackgroundCamera", typeof(Camera));
+            GameObject cameraObject = new GameObject("FrontendBackgroundCamera", typeof(Camera), typeof(AudioListener));
             cameraObject.transform.SetParent(transform, false);
             Camera backgroundCamera = cameraObject.GetComponent<Camera>();
             backgroundCamera.clearFlags = CameraClearFlags.SolidColor;
@@ -104,6 +105,27 @@ namespace DemonLord.Presentation
             contentRoot.anchorMax = Vector2.one;
             contentRoot.offsetMin = Vector2.zero;
             contentRoot.offsetMax = Vector2.zero;
+            CreateBackgroundMusic();
+        }
+
+        private void CreateBackgroundMusic()
+        {
+            AudioClip music = Resources.Load<AudioClip>(FrontendMusicPath);
+            if (music == null)
+            {
+                Debug.LogWarning("Frontend background music was not found in Resources.", this);
+                return;
+            }
+
+            GameObject musicObject = new GameObject("FrontendBackgroundMusic", typeof(AudioSource));
+            musicObject.transform.SetParent(transform, false);
+            AudioSource source = musicObject.GetComponent<AudioSource>();
+            source.clip = music;
+            source.loop = true;
+            source.playOnAwake = false;
+            source.spatialBlend = 0f;
+            source.volume = 0.32f;
+            source.Play();
         }
 
         private void Render()
