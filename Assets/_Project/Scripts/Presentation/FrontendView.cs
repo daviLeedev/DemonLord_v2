@@ -7,6 +7,8 @@ using DemonLord.Bootstrap;
 using DemonLord.Domain;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 namespace DemonLord.Presentation
@@ -45,7 +47,7 @@ namespace DemonLord.Presentation
 
         private void Update()
         {
-            if (titleCanSkip && coordinator != null && coordinator.Screen == FrontendScreen.TitleIntro && Input.anyKeyDown)
+            if (titleCanSkip && coordinator != null && coordinator.Screen == FrontendScreen.TitleIntro && WasAnyInputPressed())
             {
                 CompleteTitleIntro();
             }
@@ -62,8 +64,9 @@ namespace DemonLord.Presentation
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
 
-            GameObject eventSystemObject = new GameObject("FrontendEventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+            GameObject eventSystemObject = new GameObject("FrontendEventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
             eventSystemObject.transform.SetParent(transform, false);
+            eventSystemObject.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
 
             GameObject root = new GameObject("Content", typeof(RectTransform));
             root.transform.SetParent(canvasObject.transform, false);
@@ -419,6 +422,21 @@ namespace DemonLord.Presentation
         {
             ColorUtility.TryParseHtmlString("#" + hex, out Color color);
             return color;
+        }
+
+        private static bool WasAnyInputPressed()
+        {
+            return (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame)
+                || (Mouse.current != null
+                    && (Mouse.current.leftButton.wasPressedThisFrame
+                        || Mouse.current.rightButton.wasPressedThisFrame
+                        || Mouse.current.middleButton.wasPressedThisFrame))
+                || (Gamepad.current != null
+                    && (Gamepad.current.buttonSouth.wasPressedThisFrame
+                        || Gamepad.current.buttonNorth.wasPressedThisFrame
+                        || Gamepad.current.buttonEast.wasPressedThisFrame
+                        || Gamepad.current.buttonWest.wasPressedThisFrame
+                        || Gamepad.current.startButton.wasPressedThisFrame));
         }
     }
 }
