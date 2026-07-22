@@ -36,6 +36,7 @@ namespace DemonLord.Presentation
         private const string SettingsIconPath = "UI/Menu/settings_transparent";
         private const string ArchiveIconPath = "UI/Menu/archive_transparent";
         private const string ExitIconPath = "UI/Menu/exit_transparent";
+        private const string MainMenuPanelPath = "UI/Menu/main_menu_panel_transparent";
         private const string StoryDifficultyIconPath = "UI/Difficulty/story_transparent";
         private const string NormalDifficultyIconPath = "UI/Difficulty/normal_transparent";
         private const string HardDifficultyIconPath = "UI/Difficulty/hard_transparent";
@@ -242,13 +243,13 @@ namespace DemonLord.Presentation
             AddRawImage(TitleBackgroundPath, new Vector2(960f, 540f), new Vector2(1920f, 1080f), Color.white);
             AddPanel(new Vector2(390f, 540f), new Vector2(780f, 1080f), new Color(Iron.r, Iron.g, Iron.b, 0.83f));
             AddRawImage(TitleLogoPath, new Vector2(390f, 175f), new Vector2(600f, 338f), Color.white);
-            AddLabel("마왕성 제107관리구역", new Vector2(390f, 330f), 23, Focus, TextAnchor.MiddleCenter);
-            AddMenuButton("01  최근 기록 이어보기   CONTINUE", ContinueIconPath, 360f, BeginContinue);
-            AddMenuButton("02  신규 파견 시작       NEW GAME", NewGameIconPath, 440f, BeginNewGame);
-            AddMenuButton("03  보존 기록 열람       LOAD GAME", LoadGameIconPath, 520f, BeginLoadGame);
-            AddMenuButton("04  환경 조정            SETTINGS", SettingsIconPath, 600f, ShowUnavailable, false);
-            AddMenuButton("05  기록 보관소          ARCHIVE", ArchiveIconPath, 680f, ShowUnavailable, false);
-            AddMenuButton("06  업무 종료            EXIT", ExitIconPath, 760f, ExitApplication);
+            AddLabel("마왕성 제107관리구역", new Vector2(390f, 315f), 23, Focus, TextAnchor.MiddleCenter);
+            AddMenuButton("01  최근 기록 이어보기   CONTINUE", ContinueIconPath, 405f, BeginContinue);
+            AddMenuButton("02  신규 파견 시작       NEW GAME", NewGameIconPath, 525f, BeginNewGame);
+            AddMenuButton("03  보존 기록 열람       LOAD GAME", LoadGameIconPath, 645f, BeginLoadGame);
+            AddMenuButton("04  환경 조정            SETTINGS", SettingsIconPath, 765f, ShowUnavailable, false);
+            AddMenuButton("05  기록 보관소          ARCHIVE", ArchiveIconPath, 885f, ShowUnavailable, false);
+            AddMenuButton("06  업무 종료            EXIT", ExitIconPath, 1005f, ExitApplication);
         }
 
         private void RenderSaveSlots()
@@ -424,9 +425,16 @@ namespace DemonLord.Presentation
 
         private void AddMenuButton(string label, string iconResourcePath, float y, UnityEngine.Events.UnityAction action, bool interactable = true)
         {
-            GameObject button = AddButton(label, new Vector2(540f, y), new Vector2(620f, 64f), action, interactable, 86f);
-            AddButtonIcon(button.transform, iconResourcePath, new Vector2(54f, 54f), new Vector2(44f, 0f));
-            AddMenuAccent(button.transform);
+            GameObject button = AddButton(label, new Vector2(540f, y), new Vector2(620f, 118f), action, interactable, 132f);
+            button.GetComponent<Image>().color = Color.clear;
+            Image panel = AddMenuPanel(button.transform);
+            if (panel != null)
+            {
+                button.GetComponent<Button>().targetGraphic = panel;
+                panel.color = interactable ? Color.white : new Color(0.45f, 0.45f, 0.45f, 0.72f);
+            }
+
+            AddButtonIcon(button.transform, iconResourcePath, new Vector2(82f, 82f), new Vector2(60f, 0f));
         }
 
         private void ShowUnavailable()
@@ -626,19 +634,27 @@ namespace DemonLord.Presentation
             image.raycastTarget = false;
         }
 
-        private static void AddMenuAccent(Transform parent)
+        private static Image AddMenuPanel(Transform parent)
         {
-            GameObject accentObject = new GameObject("MenuAccent", typeof(Image));
-            accentObject.transform.SetParent(parent, false);
-            RectTransform rect = accentObject.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0f, 0f);
-            rect.anchorMax = new Vector2(0f, 1f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = new Vector2(3f, 0f);
-            Image accent = accentObject.GetComponent<Image>();
-            accent.color = new Color(Focus.r, Focus.g, Focus.b, 0.88f);
-            accent.raycastTarget = false;
+            Sprite sprite = Resources.Load<Sprite>(MainMenuPanelPath);
+            if (sprite == null)
+            {
+                return null;
+            }
+
+            GameObject panelObject = new GameObject("Panel", typeof(Image));
+            panelObject.transform.SetParent(parent, false);
+            panelObject.transform.SetAsFirstSibling();
+            RectTransform rect = panelObject.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            Image panel = panelObject.GetComponent<Image>();
+            panel.sprite = sprite;
+            panel.type = Image.Type.Sliced;
+            panel.raycastTarget = false;
+            return panel;
         }
 
         private static void ConfigureRect(RectTransform rect, Vector2 position, Vector2 size)
