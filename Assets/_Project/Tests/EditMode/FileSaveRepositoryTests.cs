@@ -46,6 +46,7 @@ namespace DemonLord.Tests.EditMode
             Assert.That(readResult.Save.SaveId, Is.EqualTo(original.SaveId));
             Assert.That(readResult.Save.Profile.ProfileName, Is.EqualTo("First Lord"));
             Assert.That(readResult.Save.Progress.EntryId, Is.EqualTo(GameEntryPoint.PrologueStartId));
+            Assert.That(readResult.Save.Location, Is.EqualTo(ExplorationLocation.Initial));
 
             SaveSlotSummary firstSlot = repository.ListSlots()[0];
             Assert.That(firstSlot.State, Is.EqualTo(SaveSlotState.Valid));
@@ -105,6 +106,42 @@ namespace DemonLord.Tests.EditMode
             Assert.That(result.ErrorCode, Is.EqualTo("future_schema_version"));
         }
 
+        [TestCase(true, TutorialMode.DetailValue)]
+        [TestCase(false, TutorialMode.OffValue)]
+        public void Load_MigratesV1TutorialBooleanWithoutOverwritingSource(bool tutorialEnabled, string expectedTutorialMode)
+        {
+            SaveSlotId.TryCreate(SaveSlotId.Slot01Value, out SaveSlotId slotId);
+            string primaryPath = GetSavePath(SaveSlotId.Slot01Value, "save.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(primaryPath));
+            File.WriteAllText(primaryPath, CreateLegacyV1Json(slotId, tutorialEnabled));
+
+            SaveReadResult result = repository.Load(slotId);
+
+            Assert.That(result.IsSuccess, Is.True, result.DiagnosticMessage);
+            Assert.That(result.Save.SchemaVersion, Is.EqualTo(SaveSchema.CurrentVersion));
+            Assert.That(result.Save.Profile.TutorialMode.Value, Is.EqualTo(expectedTutorialMode));
+            SaveEnvelopeDto originalEnvelope = JsonUtility.FromJson<SaveEnvelopeDto>(File.ReadAllText(primaryPath));
+            Assert.That(originalEnvelope.schemaVersion, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Load_MigratesV2ToV3WithDeterministicInitialLocation()
+        {
+            SaveSlotId.TryCreate(SaveSlotId.Slot02Value, out SaveSlotId slotId);
+            string primaryPath = GetSavePath(slotId.Value, "save.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(primaryPath));
+            File.WriteAllText(primaryPath, CreateLegacyV2Json(slotId));
+
+            SaveReadResult result = repository.Load(slotId);
+
+            Assert.That(result.IsSuccess, Is.True, result.DiagnosticMessage);
+            Assert.That(result.Save.SchemaVersion, Is.EqualTo(3));
+            Assert.That(result.Save.Location.AreaId.Value, Is.EqualTo(ExplorationAreaIds.WorldAdjustmentLabInterior));
+            Assert.That(result.Save.Location.SpawnId.Value, Is.EqualTo(ExplorationSpawnIds.ReceptionStart));
+            SaveEnvelopeDto source = JsonUtility.FromJson<SaveEnvelopeDto>(File.ReadAllText(primaryPath));
+            Assert.That(source.schemaVersion, Is.EqualTo(2));
+        }
+
         [Test]
         public void Delete_RemovesPrimaryAndBackupData()
         {
@@ -124,7 +161,7 @@ namespace DemonLord.Tests.EditMode
         {
             Assert.That(SaveSlotId.TryCreate(slotValue, out SaveSlotId slotId), Is.True);
             Assert.That(
-                NewGameSettings.TryCreate(profileName, DifficultyId.NormalValue, true, out NewGameSettings settings, out string errorCode),
+                NewGameSettings.TryCreate(profileName, DifficultyId.NormalValue, TutorialMode.DetailValue, out NewGameSettings settings, out string errorCode),
                 Is.True,
                 errorCode);
             return GameSave.CreateNew(slotId, settings, "0.1.0", DateTime.UtcNow);
@@ -133,6 +170,100 @@ namespace DemonLord.Tests.EditMode
         private string GetSavePath(string slotId, string fileName)
         {
             return Path.Combine(temporaryDataPath, "Saves", slotId, fileName);
+        }
+
+        private static string CreateLegacyV1Json(SaveSlotId slotId, bool tutorialEnabled)
+        {
+            LegacyV1Payload payload = new LegacyV1Payload
+            {
+                profile = new LegacyV1Profile
+                {
+                    profileName = "Legacy Lord",
+                    difficultyId = DifficultyId.NormalValue,
+                    tutorialEnabled = tutorialEnabled,
+                },
+                progress = new GameProgressDto
+                {
+                    entryId = GameEntryPoint.PrologueStartId,
+                    checkpointId = "start",
+                    playTimeSeconds = 0,
+                },
+            };
+            string payloadJson = JsonUtility.ToJson(payload, false);
+            SaveEnvelopeDto envelope = new SaveEnvelopeDto
+            {
+                schemaVersion = 1,
+                saveId = Guid.NewGuid().ToString("D"),
+                slotId = slotId.Value,
+                createdAtUtc = DateTime.UtcNow.ToString("O"),
+                updatedAtUtc = DateTime.UtcNow.ToString("O"),
+                buildVersion = "0.1.0",
+                payloadJson = payloadJson,
+                payloadSha256 = PayloadChecksum.ComputeSha256(payloadJson),
+            };
+            return JsonUtility.ToJson(envelope, false);
+        }
+
+        private static string CreateLegacyV2Json(SaveSlotId slotId)
+        {
+            LegacyV2Payload payload = new LegacyV2Payload
+            {
+                profile = new GameProfileDto
+                {
+                    profileName = "V2 Lord",
+                    difficultyId = DifficultyId.NormalValue,
+                    tutorialMode = TutorialMode.DetailValue,
+                },
+                progress = new LegacyV2Progress
+                {
+                    entryId = GameEntryPoint.PrologueStartId,
+                    checkpointId = "start",
+                    playTimeSeconds = 12,
+                },
+            };
+            string payloadJson = JsonUtility.ToJson(payload, false);
+            SaveEnvelopeDto envelope = new SaveEnvelopeDto
+            {
+                schemaVersion = 2,
+                saveId = Guid.NewGuid().ToString("D"),
+                slotId = slotId.Value,
+                createdAtUtc = DateTime.UtcNow.ToString("O"),
+                updatedAtUtc = DateTime.UtcNow.ToString("O"),
+                buildVersion = "0.1.0",
+                payloadJson = payloadJson,
+                payloadSha256 = PayloadChecksum.ComputeSha256(payloadJson),
+            };
+            return JsonUtility.ToJson(envelope, false);
+        }
+
+        [Serializable]
+        private sealed class LegacyV1Payload
+        {
+            public LegacyV1Profile profile;
+            public GameProgressDto progress;
+        }
+
+        [Serializable]
+        private sealed class LegacyV1Profile
+        {
+            public string profileName;
+            public string difficultyId;
+            public bool tutorialEnabled;
+        }
+
+        [Serializable]
+        private sealed class LegacyV2Payload
+        {
+            public GameProfileDto profile;
+            public LegacyV2Progress progress;
+        }
+
+        [Serializable]
+        private sealed class LegacyV2Progress
+        {
+            public string entryId;
+            public string checkpointId;
+            public long playTimeSeconds;
         }
     }
 }

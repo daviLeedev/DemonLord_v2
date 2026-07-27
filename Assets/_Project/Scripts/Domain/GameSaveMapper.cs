@@ -17,12 +17,14 @@ namespace DemonLord.Domain
                 {
                     profileName = save.Profile.ProfileName,
                     difficultyId = save.Profile.DifficultyId.Value,
-                    tutorialEnabled = save.Profile.TutorialEnabled,
+                    tutorialMode = save.Profile.TutorialMode.Value,
                 },
                 progress = new GameProgressDto
                 {
                     entryId = save.Progress.EntryId,
                     checkpointId = save.Progress.CheckpointId,
+                    areaId = save.Location.AreaId.Value,
+                    spawnId = save.Location.SpawnId.Value,
                     playTimeSeconds = save.PlayTimeSeconds,
                 },
             };
@@ -53,7 +55,7 @@ namespace DemonLord.Domain
             if (!NewGameSettings.TryCreate(
                     payload.profile.profileName,
                     payload.profile.difficultyId,
-                    payload.profile.tutorialEnabled,
+                    payload.profile.tutorialMode,
                     out NewGameSettings profile,
                     out errorCode))
             {
@@ -71,6 +73,16 @@ namespace DemonLord.Domain
                 return false;
             }
 
+            if (!ExplorationLocation.TryCreate(
+                    payload.progress.areaId,
+                    payload.progress.spawnId,
+                    out ExplorationLocation location,
+                    out errorCode))
+            {
+                save = null;
+                return false;
+            }
+
             try
             {
                 save = new GameSave(
@@ -82,6 +94,7 @@ namespace DemonLord.Domain
                     envelope.buildVersion,
                     profile,
                     progress,
+                    location,
                     payload.progress.playTimeSeconds);
                 errorCode = null;
                 return true;

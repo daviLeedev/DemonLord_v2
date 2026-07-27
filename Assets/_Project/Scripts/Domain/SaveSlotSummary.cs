@@ -19,7 +19,10 @@ namespace DemonLord.Domain
             string difficultyId,
             DateTime? updatedAtUtc,
             bool recoveredFromBackup,
-            string errorCode)
+            string errorCode,
+            long playTimeSeconds = 0,
+            string entryId = null,
+            string checkpointId = null)
         {
             SlotId = slotId ?? throw new ArgumentNullException(nameof(slotId));
             State = state;
@@ -28,6 +31,9 @@ namespace DemonLord.Domain
             UpdatedAtUtc = updatedAtUtc;
             RecoveredFromBackup = recoveredFromBackup;
             ErrorCode = errorCode;
+            PlayTimeSeconds = playTimeSeconds < 0 ? 0 : playTimeSeconds;
+            EntryId = entryId;
+            CheckpointId = checkpointId;
         }
 
         public SaveSlotId SlotId { get; }
@@ -43,6 +49,12 @@ namespace DemonLord.Domain
         public bool RecoveredFromBackup { get; }
 
         public string ErrorCode { get; }
+
+        public long PlayTimeSeconds { get; }
+
+        public string EntryId { get; }
+
+        public string CheckpointId { get; }
 
         public bool CanLoad => State == SaveSlotState.Valid;
 

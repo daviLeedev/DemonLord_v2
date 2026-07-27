@@ -23,7 +23,7 @@ docs/architecture/SAVE_DATA.md를 모두 읽고 지켜라. 기존 사용자 변�
 - 슬롯: slot-01, slot-02, slot-03
 - 시작 방식: Continue, NewGame
 - 새 게임 설정: profileName(정리 후 1~16자), difficultyId(story/normal/hard),
-  tutorialEnabled
+  tutorialMode(detail/core/off)
 - 초기 진입점: entryId=prologue_start, checkpointId=start
 - 세이브에 씬 이름을 저장하지 않는다. IEntryPointResolver가 안정 ID를 목적지로 변환한다.
 - Continue는 유효/호환 세이브가 있을 때만 활성화한다.

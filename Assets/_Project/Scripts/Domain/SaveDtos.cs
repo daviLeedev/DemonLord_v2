@@ -27,7 +27,7 @@ namespace DemonLord.Domain
     {
         public string profileName;
         public string difficultyId;
-        public bool tutorialEnabled;
+        public string tutorialMode;
     }
 
     [Serializable]
@@ -35,6 +35,8 @@ namespace DemonLord.Domain
     {
         public string entryId;
         public string checkpointId;
+        public string areaId;
+        public string spawnId;
         public long playTimeSeconds;
     }
 }

@@ -35,6 +35,8 @@ namespace DemonLord.Editor
             new SceneDefinition("Assets/_Project/Scenes/00_Boot.unity", "BootSceneRoot"),
             new SceneDefinition("Assets/_Project/Scenes/10_Frontend.unity", "FrontendSceneRoot"),
             new SceneDefinition("Assets/_Project/Scenes/90_GameShell.unity", "GameShellSceneRoot"),
+            new SceneDefinition("Assets/_Project/Scenes/91_LabInterior.unity", "LabInteriorSceneRoot"),
+            new SceneDefinition("Assets/_Project/Scenes/92_BureauCourtyard.unity", "BureauCourtyardSceneRoot"),
         };
 
         [InitializeOnLoadMethod]

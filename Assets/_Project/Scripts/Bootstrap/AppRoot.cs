@@ -12,6 +12,8 @@ namespace DemonLord.Bootstrap
 
         public IPlayerSession PlayerSession { get; private set; }
 
+        public SettingsService SettingsService { get; private set; }
+
         private ISceneFlowService sceneFlowService;
 
         private async void Start()
@@ -19,7 +21,7 @@ namespace DemonLord.Bootstrap
             try
             {
                 ComposeServices();
-                await sceneFlowService.LoadFrontendAsync();
+                await sceneFlowService.LoadFrontendAsync(FrontendEntryMode.Opening);
             }
             catch (Exception exception)
             {
@@ -45,6 +47,10 @@ namespace DemonLord.Bootstrap
         private void ComposeServices()
         {
             IClock clock = new SystemClock();
+            SettingsService = new SettingsService(
+                new FileSettingsRepository(UnityEngine.Application.persistentDataPath),
+                new UnityGameSettingsRuntimeApplier());
+            SettingsService.LoadAndApply();
             ISaveRepository saveRepository = new FileSaveRepository(
                 UnityEngine.Application.persistentDataPath,
                 new UnityJsonSaveSerializer(),
@@ -57,7 +63,12 @@ namespace DemonLord.Bootstrap
                 new LoadGameUseCase(saveRepository),
                 PlayerSession,
                 entryPointResolver);
-            sceneFlowService = new UnitySceneFlowService(PlayerSession, FrontendCoordinator);
+            sceneFlowService = new UnitySceneFlowService(
+                PlayerSession,
+                FrontendCoordinator,
+                SettingsService,
+                new SaveGameProgressUseCase(saveRepository, clock),
+                new UnityApplicationQuitter());
         }
     }
 }

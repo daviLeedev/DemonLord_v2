@@ -177,6 +177,12 @@ namespace DemonLord.Infrastructure
                 return SaveReadResult.Failure(SaveReadStatus.Incompatible, "future_schema_version", null);
             }
 
+            if (string.IsNullOrWhiteSpace(envelope.payloadJson)
+                || !PayloadChecksum.Matches(envelope.payloadJson, envelope.payloadSha256))
+            {
+                return SaveReadResult.Failure(SaveReadStatus.Corrupt, "payload_checksum_mismatch", null);
+            }
+
             if (envelope.schemaVersion < SaveSchema.CurrentVersion)
             {
                 if (!migrationPipeline.TryMigrate(
@@ -194,15 +200,15 @@ namespace DemonLord.Infrastructure
                 return SaveReadResult.Failure(SaveReadStatus.Incompatible, "migration_target_schema_mismatch", null);
             }
 
-            if (!SaveSlotId.TryCreate(envelope.slotId, out SaveSlotId storedSlotId) || !storedSlotId.Equals(expectedSlotId))
-            {
-                return SaveReadResult.Failure(SaveReadStatus.Corrupt, "save_slot_id_mismatch", null);
-            }
-
             if (string.IsNullOrWhiteSpace(envelope.payloadJson)
                 || !PayloadChecksum.Matches(envelope.payloadJson, envelope.payloadSha256))
             {
-                return SaveReadResult.Failure(SaveReadStatus.Corrupt, "payload_checksum_mismatch", null);
+                return SaveReadResult.Failure(SaveReadStatus.Corrupt, "migrated_payload_checksum_mismatch", null);
+            }
+
+            if (!SaveSlotId.TryCreate(envelope.slotId, out SaveSlotId storedSlotId) || !storedSlotId.Equals(expectedSlotId))
+            {
+                return SaveReadResult.Failure(SaveReadStatus.Corrupt, "save_slot_id_mismatch", null);
             }
 
             if (!serializer.TryDeserializePayload(envelope.payloadJson, out GameSavePayloadDto payload, out string payloadDiagnostic))
@@ -271,7 +277,10 @@ namespace DemonLord.Infrastructure
                     result.Save.Profile.DifficultyId.Value,
                     result.Save.UpdatedAtUtc,
                     result.RecoveredFromBackup,
-                    null);
+                    null,
+                    result.Save.PlayTimeSeconds,
+                    result.Save.Progress.EntryId,
+                    result.Save.Progress.CheckpointId);
             }
 
             if (result.Status == SaveReadStatus.Empty)

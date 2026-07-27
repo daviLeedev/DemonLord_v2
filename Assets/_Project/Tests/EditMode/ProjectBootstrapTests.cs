@@ -11,6 +11,8 @@ namespace DemonLord.Tests.EditMode
             "Assets/_Project/Scenes/00_Boot.unity",
             "Assets/_Project/Scenes/10_Frontend.unity",
             "Assets/_Project/Scenes/90_GameShell.unity",
+            "Assets/_Project/Scenes/91_LabInterior.unity",
+            "Assets/_Project/Scenes/92_BureauCourtyard.unity",
         };
 
         [Test]

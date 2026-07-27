@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using DemonLord.Application;
 using DemonLord.Presentation;
+using DemonLord.Presentation.Exploration;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -13,15 +14,27 @@ namespace DemonLord.Bootstrap
         private const string GameShellSceneName = "90_GameShell";
         private readonly IPlayerSession playerSession;
         private readonly FrontendCoordinator frontendCoordinator;
+        private readonly SettingsService settingsService;
+        private readonly SaveGameProgressUseCase saveProgress;
+        private readonly IApplicationQuitter applicationQuitter;
 
-        public UnitySceneFlowService(IPlayerSession playerSession, FrontendCoordinator frontendCoordinator)
+        public UnitySceneFlowService(
+            IPlayerSession playerSession,
+            FrontendCoordinator frontendCoordinator,
+            SettingsService settingsService,
+            SaveGameProgressUseCase saveProgress,
+            IApplicationQuitter applicationQuitter)
         {
             this.playerSession = playerSession ?? throw new ArgumentNullException(nameof(playerSession));
             this.frontendCoordinator = frontendCoordinator ?? throw new ArgumentNullException(nameof(frontendCoordinator));
+            this.settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+            this.saveProgress = saveProgress ?? throw new ArgumentNullException(nameof(saveProgress));
+            this.applicationQuitter = applicationQuitter ?? throw new ArgumentNullException(nameof(applicationQuitter));
         }
 
-        public async Task LoadFrontendAsync()
+        public async Task LoadFrontendAsync(FrontendEntryMode entryMode)
         {
+            frontendCoordinator.PrepareForEntry(entryMode);
             await LoadSceneAsync(FrontendSceneName);
             Scene scene = SceneManager.GetActiveScene();
             foreach (GameObject rootObject in scene.GetRootGameObjects())
@@ -29,7 +42,7 @@ namespace DemonLord.Bootstrap
                 FrontendView frontendView = rootObject.GetComponent<FrontendView>();
                 if (frontendView != null)
                 {
-                    frontendView.Initialize(frontendCoordinator, this);
+                    frontendView.Initialize(frontendCoordinator, this, settingsService, entryMode);
                     return;
                 }
             }
@@ -51,17 +64,39 @@ namespace DemonLord.Bootstrap
 
             await LoadSceneAsync(GameShellSceneName);
             Scene scene = SceneManager.GetActiveScene();
+            GameShellRoot gameShellRoot = null;
             foreach (GameObject rootObject in scene.GetRootGameObjects())
             {
-                GameShellSessionView sessionView = rootObject.GetComponent<GameShellSessionView>();
-                if (sessionView != null)
+                GameShellRoot candidate = rootObject.GetComponent<GameShellRoot>();
+                if (candidate == null)
                 {
-                    sessionView.SetSession(playerSession);
-                    return;
+                    continue;
                 }
+
+                if (gameShellRoot != null)
+                {
+                    throw new InvalidOperationException("Multiple GameShellRoot components were found in the GameShell scene.");
+                }
+
+                gameShellRoot = candidate;
             }
 
-            throw new InvalidOperationException("GameShellSessionView is missing from the GameShell scene.");
+            if (gameShellRoot == null)
+            {
+                throw new InvalidOperationException("GameShellRoot is missing from the GameShell scene.");
+            }
+
+            string errorCode = await gameShellRoot.InitializeAsync(
+                playerSession,
+                destination,
+                saveProgress,
+                settingsService,
+                this,
+                applicationQuitter);
+            if (errorCode != null)
+            {
+                throw new InvalidOperationException("GameShell initialization failed: " + errorCode);
+            }
         }
 
         private static Task LoadSceneAsync(string sceneName)

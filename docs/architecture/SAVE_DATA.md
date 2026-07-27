@@ -14,11 +14,11 @@ Application.persistentDataPath/
 
 파일 경로는 슬롯 ID의 화이트리스트로만 조립한다.
 
-## v1 논리 스키마
+## v3 논리 스키마
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "saveId": "uuid",
   "slotId": "slot-01",
   "createdAtUtc": "2026-07-22T00:00:00.0000000Z",
@@ -36,17 +36,19 @@ Payload에는 아래 논리 데이터가 들어간다.
   "profile": {
     "profileName": "마왕",
     "difficultyId": "normal",
-    "tutorialEnabled": true
+    "tutorialMode": "detail"
   },
   "progress": {
     "entryId": "prologue_start",
-    "checkpointId": "start",
+    "checkpointId": "reception-start",
+    "areaId": "world-adjustment-lab-interior",
+    "spawnId": "reception-start",
     "playTimeSeconds": 0
   }
 }
 ```
 
-직렬화 DTO와 런타임 도메인 객체는 분리한다. 현지화 문구, Unity 오브젝트 참조, 씬 이름은 저장하지 않는다.
+직렬화 DTO와 런타임 도메인 객체는 분리한다. 현지화 문구, Unity 오브젝트 참조, 씬 이름은 저장하지 않는다. `areaId`와 `spawnId`는 지역 정의의 안정 ID이며, 현재 씬 경로나 build index가 아니다.
 
 ## 저장/로드 알고리즘
 
@@ -82,3 +84,16 @@ SaveReadResult
 - 과거 버전은 `v1 → v2 → v3`처럼 단계별 마이그레이션을 통과한다.
 - 마이그레이션은 새 DTO를 반환하며 원본을 즉시 덮어쓰지 않는다.
 - 각 버전에는 고정 fixture 기반 EditMode 테스트를 둔다.
+
+### v1 → v2
+
+- v1의 `tutorialEnabled=true`는 `tutorialMode="detail"`로 변환한다.
+- v1의 `tutorialEnabled=false`는 `tutorialMode="off"`로 변환한다.
+- v1에는 핵심 안내 여부 정보가 없었으므로 `core`로 추정하지 않는다.
+- 마이그레이션 전에 v1 payload checksum을 먼저 검증하며, 원본 `save.json`은 자동으로 덮어쓰지 않는다.
+
+### v2 → v3
+
+- v2에는 지역 정보가 없으므로 `areaId="world-adjustment-lab-interior"`, `spawnId="reception-start"`를 명시적으로 부여한다.
+- 기존 `checkpointId`는 보존한다. 구형 entry/checkpoint 해석은 resolver가 담당하며 마이그레이션이 Unity 씬명을 기록하지 않는다.
+- v3 이후 저장은 현재 유효한 `ExplorationLocation(areaId, spawnId)`만 기록한다.

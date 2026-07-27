@@ -82,7 +82,7 @@ Assets/_Project/
 - 세이브는 `schemaVersion`, `saveId`, `slotId`, UTC 생성/수정 시각, `buildVersion`, payload, `payloadSha256`을 가진다.
 - 실제 재개 위치는 씬 이름이 아니라 안정적인 `entryId`와 `checkpointId`로 기록한다.
 - 첫 구현의 새 게임 진입값은 `entryId=prologue_start`, `checkpointId=start`다.
-- 신규 세이브 설정값은 `profileName`, `difficultyId`, `tutorialEnabled`다. 난이도 ID는 `story`, `normal`, `hard`만 허용한다.
+- 신규 세이브 설정값은 `profileName`, `difficultyId`, `tutorialMode`다. 난이도 ID는 `story`, `normal`, `hard`만 허용하며 튜토리얼 ID는 `detail`, `core`, `off`만 허용한다.
 - `profileName`은 trim 후 1~16자이며 제어 문자와 파일 경로 문자를 거부한다.
 - 저장은 `save.tmp`에 완전 작성·검증 후 최종 파일을 교체하고, 기존 정상 파일을 `save.bak`으로 남긴다.
 - 로드 실패를 빈 슬롯으로 표시하지 않는다. `Empty`, `Valid`, `Corrupt`, `Incompatible`을 구분한다.
@@ -108,3 +108,28 @@ Resolver: sceneKey="90_GameShell", spawnKey="start"
 - PlayMode: 첫 실행 새 게임, 재실행 이어하기, 덮어쓰기 취소/확인, 손상 슬롯, 빠른 연속 클릭을 스모크 테스트한다.
 - Unity 재컴파일과 테스트를 확인하고, 컴파일 오류·콘솔 예외·Missing Script/Reference가 0개여야 한다.
 - 완료 보고에는 변경 파일, 실행한 테스트와 결과, 수동 확인, 미완료 위험, 다음 한 작업을 적는다.
+
+## 비주얼 색상 시스템
+
+UI, 인트로, 탐험 연구실 및 이후 제작 에셋은 아래 팔레트를 공통 토큰으로 사용한다. 새 화면에서 임의의 색을 추가하지 말고, 필요한 경우 먼저 이 규칙을 갱신한다.
+
+| 토큰 | HEX | 사용처 |
+|---|---|---|
+| `Primary` | `#101720` | 기본 배경, 부트/주의 문구 화면의 바탕 |
+| `PrimaryLight` | `#26384B` | 중앙 광원, 약한 그라데이션, 밝은 표면 |
+| `Secondary` | `#5CAECC` | 선택 상태, 안내, 세계선/마력 효과 |
+| `SecondaryDark` | `#234B63` | 비활성 탭, 보조 테두리, 음영 |
+| `AccentGold` | `#B99A59` | 인장, 고급 장식, 핵심 상호작용 |
+| `AccentRed` | `#7D1827` | 마왕 측 요소, 위험·경고의 표면 |
+| `Surface` | `#171C22` | 다이얼로그·설정·목록 패널 바탕 |
+| `TextMain` | `#EEE6D5` | 제목, 본문, 기본 버튼 텍스트 |
+| `TextMuted` | `#9AA6AF` | 보조 설명, 비활성 텍스트 |
+| `Error` | `#D04A50` | 저장 실패, 접근 거부, 치명 경고 |
+| `BootCyan` | `#66C7E8` | 부트 로고 광원, 미세 먼지 입자 |
+| `BootBurgundy` | `#2A1018` | 플레이 전 경고 화면 하단의 매우 약한 색조 |
+
+- 세계조정국/행정 UI는 `Primary`·`Secondary`·`AccentGold`를 기본으로 하고, 마왕/위험 요소에만 `AccentRed`를 사용한다.
+- 선택·오류·비활성 상태를 색상만으로 전달하지 않는다. 텍스트, 아이콘, 테두리 또는 명도 차이를 함께 제공한다.
+- 부트 로고와 플레이 전 경고 화면은 별도의 삽화 배경이나 세계조정국 로고를 사용하지 않는다. `Primary`에서 `PrimaryLight`로 이어지는 매우 약한 방사형 광원, 검은 비네트, 느린 `BootCyan` 먼지/안개 입자만 사용할 수 있다. 경고 화면만 하단에 `BootBurgundy` 색조를 낮은 불투명도로 섞는다.
+- 부트 배경 애니메이션은 8~12초의 낮은 대비 호흡, 0.4초의 짧은 로고 광원 확산, 미세한 입자 이동으로 제한한다. 경고 화면의 스캔라인/종이 질감은 거의 인지되지 않을 정도로만 흔들 수 있다. 빠른 섬광·강한 스캔라인·지속적인 카메라 흔들림은 금지한다.
+- 새 UI 구현은 가능한 한 한 곳의 테마/토큰 정의를 통해 색을 참조한다. 개별 화면에 동일한 HEX 값을 반복 하드코딩하지 않는다.

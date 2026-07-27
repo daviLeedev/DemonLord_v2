@@ -4,7 +4,7 @@ namespace DemonLord.Domain
 {
     public static class SaveSchema
     {
-        public const int CurrentVersion = 1;
+        public const int CurrentVersion = 3;
     }
 
     public sealed class GameSave
@@ -18,6 +18,7 @@ namespace DemonLord.Domain
             string buildVersion,
             NewGameSettings profile,
             GameEntryPoint progress,
+            ExplorationLocation location,
             long playTimeSeconds)
         {
             if (schemaVersion < 1)
@@ -50,6 +51,11 @@ namespace DemonLord.Domain
                 throw new ArgumentNullException(nameof(progress));
             }
 
+            if (location == null)
+            {
+                throw new ArgumentNullException(nameof(location));
+            }
+
             if (playTimeSeconds < 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(playTimeSeconds));
@@ -63,7 +69,32 @@ namespace DemonLord.Domain
             BuildVersion = buildVersion;
             Profile = profile;
             Progress = progress;
+            Location = location;
             PlayTimeSeconds = playTimeSeconds;
+        }
+
+        public GameSave(
+            int schemaVersion,
+            string saveId,
+            SaveSlotId slotId,
+            DateTime createdAtUtc,
+            DateTime updatedAtUtc,
+            string buildVersion,
+            NewGameSettings profile,
+            GameEntryPoint progress,
+            long playTimeSeconds)
+            : this(
+                schemaVersion,
+                saveId,
+                slotId,
+                createdAtUtc,
+                updatedAtUtc,
+                buildVersion,
+                profile,
+                progress,
+                ExplorationLocation.Initial,
+                playTimeSeconds)
+        {
         }
 
         public int SchemaVersion { get; }
@@ -82,7 +113,47 @@ namespace DemonLord.Domain
 
         public GameEntryPoint Progress { get; }
 
+        public ExplorationLocation Location { get; }
+
         public long PlayTimeSeconds { get; }
+
+        /// <summary>
+        /// Returns a new immutable save snapshot at the requested in-world checkpoint.
+        /// The slot and player profile remain untouched so a gameplay checkpoint cannot
+        /// accidentally become a new-save operation.
+        /// </summary>
+        public GameSave WithProgress(GameEntryPoint progress, DateTime updatedAtUtc)
+        {
+            return WithProgress(progress, Location, updatedAtUtc);
+        }
+
+        public GameSave WithProgress(
+            GameEntryPoint progress,
+            ExplorationLocation location,
+            DateTime updatedAtUtc)
+        {
+            if (progress == null)
+            {
+                throw new ArgumentNullException(nameof(progress));
+            }
+
+            if (location == null)
+            {
+                throw new ArgumentNullException(nameof(location));
+            }
+
+            return new GameSave(
+                SchemaVersion,
+                SaveId,
+                SlotId,
+                CreatedAtUtc,
+                updatedAtUtc,
+                BuildVersion,
+                Profile,
+                progress,
+                location,
+                PlayTimeSeconds);
+        }
 
         public static GameSave CreateNew(
             SaveSlotId slotId,
@@ -90,7 +161,7 @@ namespace DemonLord.Domain
             string buildVersion,
             DateTime nowUtc)
         {
-            if (!GameEntryPoint.TryCreate(GameEntryPoint.PrologueStartId, "start", out GameEntryPoint entryPoint, out string errorCode))
+            if (!GameEntryPoint.TryCreate(GameEntryPoint.PrologueStartId, LabCheckpointId.Start, out GameEntryPoint entryPoint, out string errorCode))
             {
                 throw new InvalidOperationException("The initial entry point is invalid: " + errorCode);
             }
@@ -104,6 +175,7 @@ namespace DemonLord.Domain
                 buildVersion,
                 settings,
                 entryPoint,
+                ExplorationLocation.Initial,
                 0);
         }
 

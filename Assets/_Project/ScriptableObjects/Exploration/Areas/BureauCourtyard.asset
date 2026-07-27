@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e4348654f57fc74eb70fd050279c6d5, type: 3}
+  m_Name: BureauCourtyard
+  m_EditorClassIdentifier: DemonLord.Runtime::DemonLord.Presentation.Exploration.AreaDefinition
+  areaId: bureau_courtyard
+  sceneKey: 92_BureauCourtyard
+  displayNameKey: area.bureau_courtyard
+  fallbackDisplayName: "\uC138\uACC4\uC870\uC815\uAD6D \uC911\uC559 \uCCAD\uC0AC"
+  areaKind: 1
+  defaultSpawnId: lab_exit
+  mapDefinition: {fileID: 11400000, guid: b6980625927a630438d9e3c3757de53b, type: 2}

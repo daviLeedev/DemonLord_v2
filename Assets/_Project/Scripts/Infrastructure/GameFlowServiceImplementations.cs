@@ -26,13 +26,22 @@ namespace DemonLord.Infrastructure
 
     public sealed class EntryPointResolver : IEntryPointResolver
     {
-        public bool TryResolve(GameEntryPoint entryPoint, out EntryDestination destination, out string errorCode)
+        public bool TryResolve(
+            GameEntryPoint entryPoint,
+            ExplorationLocation location,
+            out EntryDestination destination,
+            out string errorCode)
         {
             if (entryPoint != null
                 && entryPoint.EntryId == GameEntryPoint.PrologueStartId
-                && entryPoint.CheckpointId == "start")
+                && LabCheckpointId.IsKnown(entryPoint.CheckpointId)
+                && location != null
+                && IsKnownLocation(location))
             {
-                destination = new EntryDestination("90_GameShell", "start");
+                destination = new EntryDestination(
+                    "90_GameShell",
+                    location.AreaId.Value,
+                    location.SpawnId.Value);
                 errorCode = null;
                 return true;
             }
@@ -40,6 +49,20 @@ namespace DemonLord.Infrastructure
             destination = null;
             errorCode = "unsupported_entry_point";
             return false;
+        }
+
+        private static bool IsKnownLocation(ExplorationLocation location)
+        {
+            string areaId = location.AreaId.Value;
+            string spawnId = location.SpawnId.Value;
+            if (string.Equals(areaId, ExplorationAreaIds.WorldAdjustmentLabInterior, StringComparison.Ordinal))
+            {
+                return string.Equals(spawnId, ExplorationSpawnIds.ReceptionStart, StringComparison.Ordinal)
+                    || string.Equals(spawnId, ExplorationSpawnIds.CourtyardEntrance, StringComparison.Ordinal);
+            }
+
+            return string.Equals(areaId, ExplorationAreaIds.BureauCourtyard, StringComparison.Ordinal)
+                && string.Equals(spawnId, ExplorationSpawnIds.LabExit, StringComparison.Ordinal);
         }
     }
 }

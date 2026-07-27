@@ -4,6 +4,16 @@ using DemonLord.Domain;
 
 namespace DemonLord.Application
 {
+    /// <summary>
+    /// Declares how the frontend scene should be initialized.
+    /// Opening is used only for a cold application boot; MainMenu is used when gameplay returns to title.
+    /// </summary>
+    public enum FrontendEntryMode
+    {
+        Opening,
+        MainMenu,
+    }
+
     public enum FrontendScreen
     {
         LogoNotice,
@@ -14,6 +24,9 @@ namespace DemonLord.Application
         SaveSlotsNew,
         NewGameSetup,
         ConfirmOverwrite,
+        Settings,
+        ArchiveLocked,
+        ConfirmExit,
         Busy,
         ErrorDialog,
     }
@@ -80,9 +93,32 @@ namespace DemonLord.Application
 
         public IReadOnlyList<SaveSlotSummary> Slots => slots;
 
+        public bool HasContinueSlot => FindLatestLoadableSlot() != null;
+
         public SaveSlotId SelectedSlotId { get; private set; }
 
         public string ErrorCode { get; private set; }
+
+        /// <summary>
+        /// Resets transient frontend state before the frontend scene is presented.
+        /// A gameplay return must never inherit the previous Busy state, because that state belongs to
+        /// the scene that just unloaded.
+        /// </summary>
+        public void PrepareForEntry(FrontendEntryMode entryMode)
+        {
+            SelectedSlotId = null;
+            ErrorCode = null;
+            returnScreen = FrontendScreen.MainMenu;
+            if (entryMode == FrontendEntryMode.MainMenu)
+            {
+                slots = listSaveSlots.Execute();
+                Screen = FrontendScreen.MainMenu;
+                return;
+            }
+
+            slots = new SaveSlotSummary[0];
+            Screen = FrontendScreen.LogoNotice;
+        }
 
         public bool CompleteLogoNotice()
         {
@@ -97,6 +133,60 @@ namespace DemonLord.Application
         public bool OpenStartMode()
         {
             return Move(FrontendScreen.MainMenu, FrontendScreen.StartMode);
+        }
+
+        public bool OpenSettings()
+        {
+            return Move(FrontendScreen.MainMenu, FrontendScreen.Settings);
+        }
+
+        public bool RefreshMainMenuSlots()
+        {
+            if (Screen != FrontendScreen.MainMenu)
+            {
+                return false;
+            }
+
+            slots = listSaveSlots.Execute();
+            return true;
+        }
+
+        public FrontendCommandResult ContinueLatest()
+        {
+            if (Screen != FrontendScreen.MainMenu)
+            {
+                return FrontendCommandResult.Rejected("invalid_continue_state");
+            }
+
+            slots = listSaveSlots.Execute();
+            SaveSlotSummary latestSlot = FindLatestLoadableSlot();
+            if (latestSlot == null)
+            {
+                return FrontendCommandResult.Rejected("continue_save_not_found");
+            }
+
+            return LoadSlot(latestSlot.SlotId, FrontendScreen.MainMenu);
+        }
+
+        public bool OpenArchiveLocked()
+        {
+            return Move(FrontendScreen.MainMenu, FrontendScreen.ArchiveLocked);
+        }
+
+        public bool OpenExitConfirmation()
+        {
+            return Move(FrontendScreen.MainMenu, FrontendScreen.ConfirmExit);
+        }
+
+        public bool ConfirmExit(bool confirmed)
+        {
+            if (Screen != FrontendScreen.ConfirmExit)
+            {
+                return false;
+            }
+
+            Screen = confirmed ? FrontendScreen.Busy : FrontendScreen.MainMenu;
+            return true;
         }
 
         public FrontendCommandResult OpenContinueSlots()
@@ -171,11 +261,18 @@ namespace DemonLord.Application
                     return true;
                 case FrontendScreen.SaveSlotsLoad:
                 case FrontendScreen.SaveSlotsNew:
-                    Screen = FrontendScreen.StartMode;
+                    // Main menu exposes the new/load choices directly. Returning to StartMode
+                    // leaves the presentation with an otherwise transient state and rendered a busy spinner.
+                    Screen = FrontendScreen.MainMenu;
                     return true;
                 case FrontendScreen.NewGameSetup:
                 case FrontendScreen.ConfirmOverwrite:
                     Screen = FrontendScreen.SaveSlotsNew;
+                    return true;
+                case FrontendScreen.Settings:
+                case FrontendScreen.ArchiveLocked:
+                case FrontendScreen.ConfirmExit:
+                    Screen = FrontendScreen.MainMenu;
                     return true;
                 case FrontendScreen.ErrorDialog:
                     Screen = returnScreen;
@@ -184,6 +281,18 @@ namespace DemonLord.Application
                 default:
                     return false;
             }
+        }
+
+        public bool HandleSceneLoadFailure(string errorCode)
+        {
+            if (Screen != FrontendScreen.Busy)
+            {
+                return false;
+            }
+
+            playerSession.Clear();
+            ShowError(string.IsNullOrWhiteSpace(errorCode) ? "scene_load_failed" : errorCode, returnScreen);
+            return true;
         }
 
         private FrontendCommandResult OpenSlots(FrontendScreen targetScreen)
@@ -207,12 +316,24 @@ namespace DemonLord.Application
                 return FrontendCommandResult.Rejected("slot_is_not_loadable");
             }
 
-            returnScreen = FrontendScreen.SaveSlotsLoad;
+            return LoadSlot(SelectedSlotId, FrontendScreen.SaveSlotsLoad);
+        }
+
+        private FrontendCommandResult LoadSlot(SaveSlotId slotId, FrontendScreen recoveryScreen)
+        {
+            SaveSlotSummary summary = FindSlotSummary(slotId);
+            if (summary == null || !summary.CanLoad)
+            {
+                return FrontendCommandResult.Rejected("slot_is_not_loadable");
+            }
+
+            SelectedSlotId = slotId;
+            returnScreen = recoveryScreen;
             Screen = FrontendScreen.Busy;
-            SaveReadResult result = loadGame.Execute(SelectedSlotId);
+            SaveReadResult result = loadGame.Execute(slotId);
             if (!result.IsSuccess)
             {
-                ShowError(result.ErrorCode, FrontendScreen.SaveSlotsLoad);
+                ShowError(result.ErrorCode, recoveryScreen);
                 return FrontendCommandResult.Rejected(result.ErrorCode);
             }
 
@@ -221,7 +342,7 @@ namespace DemonLord.Application
 
         private FrontendCommandResult ResolveAndSetSession(GameSave save)
         {
-            if (!entryPointResolver.TryResolve(save.Progress, out EntryDestination destination, out string errorCode))
+            if (!entryPointResolver.TryResolve(save.Progress, save.Location, out EntryDestination destination, out string errorCode))
             {
                 ShowError(errorCode, returnScreen);
                 return FrontendCommandResult.Rejected(errorCode);
@@ -249,6 +370,28 @@ namespace DemonLord.Application
             }
 
             return null;
+        }
+
+        private SaveSlotSummary FindLatestLoadableSlot()
+        {
+            SaveSlotSummary latest = null;
+            foreach (SaveSlotSummary slot in slots)
+            {
+                if (!slot.CanLoad)
+                {
+                    continue;
+                }
+
+                if (latest == null
+                    || slot.UpdatedAtUtc.GetValueOrDefault() > latest.UpdatedAtUtc.GetValueOrDefault()
+                    || (slot.UpdatedAtUtc.GetValueOrDefault() == latest.UpdatedAtUtc.GetValueOrDefault()
+                        && string.CompareOrdinal(slot.SlotId.Value, latest.SlotId.Value) < 0))
+                {
+                    latest = slot;
+                }
+            }
+
+            return latest;
         }
 
         private bool Move(FrontendScreen expected, FrontendScreen target)

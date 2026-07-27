@@ -5,6 +5,7 @@ namespace DemonLord.Presentation
 {
     public sealed class GameShellSessionView : MonoBehaviour
     {
+        [SerializeField] private bool showDiagnostics = false;
         private IPlayerSession playerSession;
 
         public void SetSession(IPlayerSession session)
@@ -14,7 +15,15 @@ namespace DemonLord.Presentation
 
         private void OnGUI()
         {
-            GUI.Box(new Rect(24, 24, 420, 148), "DemonLord GameShell");
+#if !UNITY_EDITOR && !DEVELOPMENT_BUILD
+            return;
+#else
+            if (!showDiagnostics)
+            {
+                return;
+            }
+
+            GUI.Box(new Rect(24, 24, 420, 180), "DemonLord GameShell");
             if (playerSession == null || playerSession.CurrentSave == null)
             {
                 GUI.Label(new Rect(44, 64, 380, 28), "No active save session.");
@@ -24,6 +33,8 @@ namespace DemonLord.Presentation
             GUI.Label(new Rect(44, 64, 380, 28), "Profile: " + playerSession.CurrentSave.Profile.ProfileName);
             GUI.Label(new Rect(44, 94, 380, 28), "Entry: " + playerSession.CurrentSave.Progress.EntryId);
             GUI.Label(new Rect(44, 124, 380, 28), "Checkpoint: " + playerSession.CurrentSave.Progress.CheckpointId);
+            GUI.Label(new Rect(44, 154, 380, 28), "Tutorial: " + playerSession.CurrentSave.Profile.TutorialMode.Value);
+#endif
         }
     }
 }

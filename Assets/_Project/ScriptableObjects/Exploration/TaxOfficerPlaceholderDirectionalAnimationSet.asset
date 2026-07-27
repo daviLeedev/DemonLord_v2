@@ -1,0 +1,146 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6c2d7d3ae154de43a880bcfdf9112ee, type: 3}
+  m_Name: TaxOfficerPlaceholderDirectionalAnimationSet
+  m_EditorClassIdentifier: DemonLord.Runtime::DemonLord.Presentation.Exploration.DirectionalAnimationSet
+  idle:
+  - frames:
+    - {fileID: 21300000, guid: 8d26261615634fe42aa743309dbda73c, type: 3}
+    framesPerSecond: 4
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 5e969f40b58889546aaa0a625c49879d, type: 3}
+    framesPerSecond: 4
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: f75138aaa33dd3b40958896b87309848, type: 3}
+    framesPerSecond: 4
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 7ff6433394a37ec4da74aefc5ae3a4af, type: 3}
+    framesPerSecond: 4
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 427b6ecd1ad248d498c376c4db1a7f08, type: 3}
+    framesPerSecond: 4
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 0906d24086612784baa40b2859faaf54, type: 3}
+    framesPerSecond: 4
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 757c32d875bdf00419038d652e51adce, type: 3}
+    framesPerSecond: 4
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: ae8342a2a0e337240b8fac346f35ef84, type: 3}
+    framesPerSecond: 4
+    loop: 1
+  walk:
+  - frames:
+    - {fileID: 21300000, guid: 4aab015dc43b7f54ab250cfc746a9987, type: 3}
+    framesPerSecond: 8
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: c49834ba749301245ba31f02ce13fac1, type: 3}
+    framesPerSecond: 8
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: b9950b224df51a3448a5fe67c450c891, type: 3}
+    framesPerSecond: 8
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: f2e4193dc4e2a6a48a6574b6c58de3e8, type: 3}
+    framesPerSecond: 8
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: c7771ac7bb0f1c94f8d7db9ae34778aa, type: 3}
+    framesPerSecond: 8
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 62563ceb941cf3b448bdabca30d81654, type: 3}
+    framesPerSecond: 8
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: b429a07d0ad7a014aab73f813b1a4b4a, type: 3}
+    framesPerSecond: 8
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 0672dd3110551884b9aa9466dfbf414c, type: 3}
+    framesPerSecond: 8
+    loop: 1
+  run:
+  - frames:
+    - {fileID: 21300000, guid: 8e332943baac3cd46a53edf4321fec2b, type: 3}
+    framesPerSecond: 12
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 37da2cfde05f1034796e519c98cf3327, type: 3}
+    framesPerSecond: 12
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 5f0638ac55059d34cb003114e4fcf33e, type: 3}
+    framesPerSecond: 12
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 24bfc8336fc1ac748b04bc69b69a42cf, type: 3}
+    framesPerSecond: 12
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 97d26a00908c7d545ae168d4dd604935, type: 3}
+    framesPerSecond: 12
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: bf8ef175f36e2aa49a713eaaf1fe810f, type: 3}
+    framesPerSecond: 12
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: c54acf9b56caed443a1d327b280aa8ab, type: 3}
+    framesPerSecond: 12
+    loop: 1
+  - frames:
+    - {fileID: 21300000, guid: 91cb74075b0ae2f4a9ae7734f194e2bb, type: 3}
+    framesPerSecond: 12
+    loop: 1
+  dash:
+  - frames:
+    - {fileID: 21300000, guid: 51166a92c46b15344bff288d97c70bd2, type: 3}
+    framesPerSecond: 16
+    loop: 0
+  - frames:
+    - {fileID: 21300000, guid: 5fb34739c379ec64ba65d9b28f6ea86d, type: 3}
+    framesPerSecond: 16
+    loop: 0
+  - frames:
+    - {fileID: 21300000, guid: d20603c46c851c84fad606a4065c2187, type: 3}
+    framesPerSecond: 16
+    loop: 0
+  - frames:
+    - {fileID: 21300000, guid: e3e9e92924ef59044ade8182479da4c8, type: 3}
+    framesPerSecond: 16
+    loop: 0
+  - frames:
+    - {fileID: 21300000, guid: 9e4c492ab3b116041b2e93c5fdd6dcc4, type: 3}
+    framesPerSecond: 16
+    loop: 0
+  - frames:
+    - {fileID: 21300000, guid: 138abb20722fcfb48879eaecd80bb154, type: 3}
+    framesPerSecond: 16
+    loop: 0
+  - frames:
+    - {fileID: 21300000, guid: eed67017df53110488e635c5ccea7242, type: 3}
+    framesPerSecond: 16
+    loop: 0
+  - frames:
+    - {fileID: 21300000, guid: 2e8279d70ac22314cb7f8c76815a0982, type: 3}
+    framesPerSecond: 16
+    loop: 0

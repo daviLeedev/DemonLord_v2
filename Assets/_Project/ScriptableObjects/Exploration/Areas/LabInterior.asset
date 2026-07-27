@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e4348654f57fc74eb70fd050279c6d5, type: 3}
+  m_Name: LabInterior
+  m_EditorClassIdentifier: DemonLord.Runtime::DemonLord.Presentation.Exploration.AreaDefinition
+  areaId: world_adjustment_lab_interior
+  sceneKey: 91_LabInterior
+  displayNameKey: area.world_adjustment_lab_interior
+  fallbackDisplayName: "\uC138\uACC4\uC870\uC815\uAD6D \uC5F0\uAD6C\uC2E4"
+  areaKind: 0
+  defaultSpawnId: reception_start
+  mapDefinition: {fileID: 11400000, guid: 7337b72686c7c0043894937f4ddd3e68, type: 2}

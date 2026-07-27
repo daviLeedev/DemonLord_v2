@@ -14,5 +14,11 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/_Project/Scenes/90_GameShell.unity
     guid: 5250b94ef0a3a254a8f2a0bf1000be65
+  - enabled: 1
+    path: Assets/_Project/Scenes/91_LabInterior.unity
+    guid: f40309fb57c08fa4e8153f2a2e103a86
+  - enabled: 1
+    path: Assets/_Project/Scenes/92_BureauCourtyard.unity
+    guid: 00cbae5a8957f1644b3cf79f581e744b
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

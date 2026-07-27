@@ -5,7 +5,7 @@ namespace DemonLord.Bootstrap
 {
     public interface ISceneFlowService
     {
-        Task LoadFrontendAsync();
+        Task LoadFrontendAsync(FrontendEntryMode entryMode);
 
         Task LoadEntryAsync(EntryDestination destination);
     }

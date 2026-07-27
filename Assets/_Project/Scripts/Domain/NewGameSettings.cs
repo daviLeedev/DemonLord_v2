@@ -9,23 +9,23 @@ namespace DemonLord.Domain
             '<', '>', ':', '"', '/', '\\', '|', '?', '*',
         };
 
-        private NewGameSettings(string profileName, DifficultyId difficultyId, bool tutorialEnabled)
+        private NewGameSettings(string profileName, DifficultyId difficultyId, TutorialMode tutorialMode)
         {
             ProfileName = profileName;
             DifficultyId = difficultyId;
-            TutorialEnabled = tutorialEnabled;
+            TutorialMode = tutorialMode;
         }
 
         public string ProfileName { get; }
 
         public DifficultyId DifficultyId { get; }
 
-        public bool TutorialEnabled { get; }
+        public TutorialMode TutorialMode { get; }
 
         public static bool TryCreate(
             string profileName,
             string difficultyId,
-            bool tutorialEnabled,
+            string tutorialMode,
             out NewGameSettings settings,
             out string errorCode)
         {
@@ -51,7 +51,14 @@ namespace DemonLord.Domain
                 return false;
             }
 
-            settings = new NewGameSettings(normalizedProfileName, parsedDifficultyId, tutorialEnabled);
+            if (!TutorialMode.TryCreate(tutorialMode, out TutorialMode parsedTutorialMode))
+            {
+                settings = null;
+                errorCode = "invalid_tutorial_mode";
+                return false;
+            }
+
+            settings = new NewGameSettings(normalizedProfileName, parsedDifficultyId, parsedTutorialMode);
             errorCode = null;
             return true;
         }

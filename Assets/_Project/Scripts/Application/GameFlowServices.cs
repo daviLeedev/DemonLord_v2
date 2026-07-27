@@ -20,18 +20,30 @@ namespace DemonLord.Application
 
     public interface IEntryPointResolver
     {
-        bool TryResolve(GameEntryPoint entryPoint, out EntryDestination destination, out string errorCode);
+        bool TryResolve(
+            GameEntryPoint entryPoint,
+            ExplorationLocation location,
+            out EntryDestination destination,
+            out string errorCode);
     }
 
     public sealed class EntryDestination
     {
         public EntryDestination(string sceneKey, string spawnKey)
+            : this(sceneKey, ExplorationAreaIds.WorldAdjustmentLabInterior, spawnKey)
+        {
+        }
+
+        public EntryDestination(string sceneKey, string areaId, string spawnKey)
         {
             SceneKey = sceneKey;
+            AreaId = areaId;
             SpawnKey = spawnKey;
         }
 
         public string SceneKey { get; }
+
+        public string AreaId { get; }
 
         public string SpawnKey { get; }
     }
