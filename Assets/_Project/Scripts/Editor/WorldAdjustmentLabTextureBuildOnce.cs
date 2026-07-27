@@ -12,7 +12,7 @@ namespace DemonLord.Editor
         // The laboratory builder owns the source player/camera/UI hierarchy.
         // The area builder must always run after it because it binds persistent
         // shell services to those freshly-created objects.
-        private const string RunKey = "DemonLord.WorldAdjustmentLab.IntegratedAreaBuild.V1";
+        private const string RunKey = "DemonLord.WorldAdjustmentLab.IntegratedAreaBuild.V2";
 
         [InitializeOnLoadMethod]
         private static void Schedule()

@@ -124,10 +124,11 @@ namespace DemonLord.Editor
             DirectionalAnimationSet animationSet = CreateDirectionalAnimationSet();
             DialogueTheme dialogueTheme = CreateDialogueTheme();
             DialogueSequence researcherSequence = CreateResearcherDialogue(dialogueVisuals.TaxOfficerPortrait, dialogueVisuals.ResearcherPortrait);
+            DialogueSequence combatLiaisonSequence = CreateCombatLiaisonDialogue(dialogueVisuals.TaxOfficerPortrait);
             LabMaterials materials = CreateMaterials();
             TaxOfficerModelPackage taxOfficerModel = TaxOfficerModelAssetBuilder.Prepare();
             LabPrefabs prefabs = CreatePrefabs(materials, taxOfficerModel);
-            return new LabAssets(animationSet, dialogueTheme, researcherSequence, dialogueVisuals, bureauSeal, materials, prefabs);
+            return new LabAssets(animationSet, dialogueTheme, researcherSequence, combatLiaisonSequence, dialogueVisuals, bureauSeal, materials, prefabs);
         }
 
         private static DialogueVisualAssets CreateDialogueVisualAssets()
@@ -208,6 +209,32 @@ namespace DemonLord.Editor
                 CreateDialogueLine(DialogueSpeakerSide.Player, "승인되지 않은 조정 기록부터 분리해 주세요. 현장은 제가 확인하겠습니다."),
                 CreateDialogueLine(DialogueSpeakerSide.Partner, "격리 연구실은 아직 봉쇄 상태입니다. 접근 허가 없이 문을 열 수 없습니다."),
                 CreateDialogueLine(DialogueSpeakerSide.Player, "알겠습니다. 우선 공개된 기록부터 검토하죠."),
+            };
+            sequence.Configure(player, partner, lines);
+            EditorUtility.SetDirty(sequence);
+            return sequence;
+        }
+
+        private static DialogueSequence CreateCombatLiaisonDialogue(Sprite taxOfficerPortrait)
+        {
+            const string assetPath = ScriptableObjectFolder + "/CombatLiaisonBriefing.asset";
+            DialogueSequence sequence = AssetDatabase.LoadAssetAtPath<DialogueSequence>(assetPath);
+            if (sequence == null)
+            {
+                sequence = ScriptableObject.CreateInstance<DialogueSequence>();
+                AssetDatabase.CreateAsset(sequence, assetPath);
+            }
+
+            DialogueParticipant player = new DialogueParticipant();
+            player.Configure("tax-officer", "세무관", taxOfficerPortrait);
+            DialogueParticipant partner = new DialogueParticipant();
+            // The combat liaison portrait is intentionally left empty until its final art is supplied.
+            partner.Configure("combat-liaison-officer", "전투 대응 집행관", null);
+            DialogueLine[] lines =
+            {
+                CreateDialogueLine(DialogueSpeakerSide.Partner, "세무관님, 조정 대상의 적대 반응이 확인됐습니다."),
+                CreateDialogueLine(DialogueSpeakerSide.Player, "전투 구역 좌표와 현장 기록부터 확보해 주세요."),
+                CreateDialogueLine(DialogueSpeakerSide.Partner, "좌표는 확보했습니다. 출동 승인이 내려오면 즉시 안내하겠습니다."),
             };
             sequence.Configure(player, partner, lines);
             EditorUtility.SetDirty(sequence);
@@ -389,6 +416,7 @@ namespace DemonLord.Editor
             BuildLocationVolumes(environment, locationTracker);
             LabDoorController archiveAnnexDoor = BuildDoors(gameplay, assets.Materials, hud.Notification);
             PrototypeInteractable researcher = CreateResearcher(assets.Prefabs.Npc, scene, gameplay, hud.DialogueController, assets.ResearcherSequence);
+            PrototypeInteractable combatLiaison = CreateCombatLiaisonOfficer(assets.Prefabs.Npc, scene, gameplay, hud.DialogueController, assets.CombatLiaisonSequence);
             PrototypeInteractable ledger = CreateLedger(gameplay, assets.Materials, hud.DialogueController);
             PrototypeInteractable analysisConsole = CreateInspectionNode(
                 "WorldlineAnalysisConsole",
@@ -418,6 +446,7 @@ namespace DemonLord.Editor
                 new Vector3(0f, 0f, 16.4f),
                 new[] { "봉인 회수함은 상위 등급의 결재가 필요합니다." });
             FaceAnchorToward(researcher.DialogueCameraAnchor, researcher.FocusPoint.position);
+            FaceAnchorToward(combatLiaison.DialogueCameraAnchor, combatLiaison.FocusPoint.position);
 
             LabProgressController progress = GetOrAdd<LabProgressController>(sceneRoot);
             progress.Configure(hud.DialogueController, hud.Notification, researcher, ledger, archiveCatalog, archiveAnnexDoor);
@@ -441,7 +470,7 @@ namespace DemonLord.Editor
                 locationTracker,
                 hud.InGameUiCoordinator);
 
-            MarkDirty(shell, diagnostics, progress, locationTracker, start, researcherCheckpoint, ledgerCheckpoint, archiveCheckpoint, controller, input, facing, motor, sensor, gameCamera, cameraRig, hud.DialogueController, hud.DialogueView, hud.Notification, hud.InGameHudView, hud.PauseMenuView, hud.InGameUiCoordinator, researcher, ledger, analysisConsole, archiveCatalog, annexCabinet);
+            MarkDirty(shell, diagnostics, progress, locationTracker, start, researcherCheckpoint, ledgerCheckpoint, archiveCheckpoint, controller, input, facing, motor, sensor, gameCamera, cameraRig, hud.DialogueController, hud.DialogueView, hud.Notification, hud.InGameHudView, hud.PauseMenuView, hud.InGameUiCoordinator, researcher, combatLiaison, ledger, analysisConsole, archiveCatalog, annexCabinet);
         }
 
         private static SpawnPoint CreateSpawnPoint(Transform parent, string key, Vector3 position)
@@ -671,6 +700,30 @@ namespace DemonLord.Editor
             instance.transform.SetPositionAndRotation(new Vector3(9.25f, 0f, -0.35f), Quaternion.Euler(0f, 180f, 0f));
             PrototypeInteractable interactable = instance.GetComponent<PrototypeInteractable>();
             ConfigureInteractable(interactable, "worldline-researcher", "세계선 분석 연구원", "대화", dialogueController, instance.GetComponent<PlayerFacing>(), sequence, null);
+            return interactable;
+        }
+
+        private static PrototypeInteractable CreateCombatLiaisonOfficer(
+            GameObject prefab,
+            Scene scene,
+            Transform parent,
+            DialogueFocusController dialogueController,
+            DialogueSequence sequence)
+        {
+            GameObject instance = InstantiatePrefab(prefab, scene, parent, "CombatLiaisonOfficer");
+            instance.transform.SetPositionAndRotation(new Vector3(-12.4f, 0f, 2.55f), Quaternion.Euler(0f, 135f, 0f));
+            PrototypeInteractable interactable = instance.GetComponent<PrototypeInteractable>();
+            ConfigureInteractable(
+                interactable,
+                "combat-liaison-officer",
+                "전투 대응 집행관",
+                "대화",
+                dialogueController,
+                instance.GetComponent<PlayerFacing>(),
+                sequence,
+                null);
+
+            // Future battle work should listen for dialogue completion and filter this stable ID.
             return interactable;
         }
 
@@ -1230,6 +1283,22 @@ namespace DemonLord.Editor
                 throw new InvalidOperationException("The researcher dialogue sequence and both portrait slots are required.");
             }
 
+            DialogueSequence combatLiaisonSequence = AssetDatabase.LoadAssetAtPath<DialogueSequence>(ScriptableObjectFolder + "/CombatLiaisonBriefing.asset");
+            if (combatLiaisonSequence == null
+                || !combatLiaisonSequence.IsValid()
+                || combatLiaisonSequence.Partner == null
+                || !string.Equals(combatLiaisonSequence.Partner.SpeakerId, "combat-liaison-officer", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The combat liaison dialogue sequence is missing or invalid.");
+            }
+
+            PrototypeInteractable[] interactables = generated.GetComponentsInChildren<PrototypeInteractable>(true);
+            if (interactables.Count(candidate => candidate != null
+                    && string.Equals(candidate.StableId, "combat-liaison-officer", StringComparison.Ordinal)) != 1)
+            {
+                throw new InvalidOperationException("World Adjustment Lab requires exactly one combat liaison interaction point.");
+            }
+
             DialogueTheme dialogueTheme = AssetDatabase.LoadAssetAtPath<DialogueTheme>(ScriptableObjectFolder + "/WorldAdjustmentLabDialogueTheme.asset");
             if (dialogueTheme == null
                 || dialogueTheme.Font == null
@@ -1679,11 +1748,12 @@ namespace DemonLord.Editor
 
         private readonly struct LabAssets
         {
-            public LabAssets(DirectionalAnimationSet animationSet, DialogueTheme dialogueTheme, DialogueSequence researcherSequence, DialogueVisualAssets dialogueVisuals, Sprite bureauSeal, LabMaterials materials, LabPrefabs prefabs)
+            public LabAssets(DirectionalAnimationSet animationSet, DialogueTheme dialogueTheme, DialogueSequence researcherSequence, DialogueSequence combatLiaisonSequence, DialogueVisualAssets dialogueVisuals, Sprite bureauSeal, LabMaterials materials, LabPrefabs prefabs)
             {
                 AnimationSet = animationSet;
                 DialogueTheme = dialogueTheme;
                 ResearcherSequence = researcherSequence;
+                CombatLiaisonSequence = combatLiaisonSequence;
                 DialogueVisuals = dialogueVisuals;
                 BureauSeal = bureauSeal;
                 Materials = materials;
@@ -1693,6 +1763,7 @@ namespace DemonLord.Editor
             public DirectionalAnimationSet AnimationSet { get; }
             public DialogueTheme DialogueTheme { get; }
             public DialogueSequence ResearcherSequence { get; }
+            public DialogueSequence CombatLiaisonSequence { get; }
             public DialogueVisualAssets DialogueVisuals { get; }
             public Sprite BureauSeal { get; }
             public LabMaterials Materials { get; }
