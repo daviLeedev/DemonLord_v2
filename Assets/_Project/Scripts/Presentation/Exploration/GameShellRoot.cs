@@ -27,6 +27,7 @@ namespace DemonLord.Presentation.Exploration
         [SerializeField] private InGameUiCoordinator inGameUiCoordinator;
         [SerializeField] private AreaTransitionCoordinator areaTransitionCoordinator;
         [SerializeField] private MapCoordinator mapCoordinator;
+        [SerializeField] private BattleHandoffCoordinator battleHandoffCoordinator;
         [SerializeField] private GameObject[] legacyAreaContentRoots = Array.Empty<GameObject>();
         [SerializeField] private SpawnPoint[] spawnPoints = Array.Empty<SpawnPoint>();
 
@@ -53,6 +54,8 @@ namespace DemonLord.Presentation.Exploration
 
         public InGameUiCoordinator InGameUiCoordinator => inGameUiCoordinator;
 
+        public BattleHandoffCoordinator BattleHandoffCoordinator => battleHandoffCoordinator;
+
         public AreaTransitionCoordinator AreaTransitionCoordinator => areaTransitionCoordinator;
 
         public MapCoordinator MapCoordinator => mapCoordinator;
@@ -78,7 +81,8 @@ namespace DemonLord.Presentation.Exploration
             LocationTracker configuredLocationTracker = null,
             InGameUiCoordinator configuredInGameUiCoordinator = null,
             AreaTransitionCoordinator configuredAreaTransitionCoordinator = null,
-            MapCoordinator configuredMapCoordinator = null)
+            MapCoordinator configuredMapCoordinator = null,
+            BattleHandoffCoordinator configuredBattleHandoffCoordinator = null)
         {
             playerRoot = configuredPlayerRoot;
             playerController = configuredPlayerController;
@@ -95,6 +99,7 @@ namespace DemonLord.Presentation.Exploration
             inGameUiCoordinator = configuredInGameUiCoordinator;
             areaTransitionCoordinator = configuredAreaTransitionCoordinator;
             mapCoordinator = configuredMapCoordinator;
+            battleHandoffCoordinator = configuredBattleHandoffCoordinator;
             spawnPoints = configuredSpawnPoints == null
                 ? Array.Empty<SpawnPoint>()
                 : (SpawnPoint[])configuredSpawnPoints.Clone();
@@ -224,6 +229,7 @@ namespace DemonLord.Presentation.Exploration
                 locationTracker.Configure(playerRoot);
                 locationTracker.Initialize(hudStateSource);
                 inGameHudView.Initialize(hudStateSource);
+                inGameHudView.BindObjectiveSource(progressController);
                 if (!inGameUiCoordinator.TryInitialize(
                         playerSession,
                         saveProgress,
@@ -296,6 +302,7 @@ namespace DemonLord.Presentation.Exploration
             locationTracker.Configure(playerRoot);
             locationTracker.Initialize(hudStateSource);
             inGameHudView.Initialize(hudStateSource);
+            inGameHudView.BindObjectiveSource(progressController);
 
             SetLegacyAreaContentEnabled(false);
 
@@ -321,6 +328,7 @@ namespace DemonLord.Presentation.Exploration
             progressController?.BindAreaContent(
                 areaTransitionCoordinator.CurrentAreaRoot,
                 areaTransitionCoordinator.LocationState);
+            battleHandoffCoordinator?.BindLocationState(areaTransitionCoordinator.LocationState);
             areaTransitionCoordinator.AreaChanged += OnAreaChanged;
 
             if (!inGameUiCoordinator.TryInitialize(
@@ -412,6 +420,7 @@ namespace DemonLord.Presentation.Exploration
         private void OnAreaChanged(AreaDefinition definition, AreaRoot areaRoot)
         {
             progressController?.BindAreaContent(areaRoot, areaTransitionCoordinator.LocationState);
+            battleHandoffCoordinator?.BindLocationState(areaTransitionCoordinator.LocationState);
         }
 
         private void DisposeHudState()

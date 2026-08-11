@@ -9,7 +9,6 @@ namespace DemonLord.Presentation.Exploration
         [SerializeField] private ExplorationInputReader inputReader = null;
         [SerializeField] private PlayerFacing playerFacing = null;
         [SerializeField] private Transform playerRoot;
-        [SerializeField] private QuarterViewCameraRig cameraRig = null;
         [SerializeField] private DialogueView dialogueView = null;
         [SerializeField] private CanvasGroup dialogueCanvasGroup = null;
         [SerializeField] private Text speakerLabel = null;
@@ -19,7 +18,6 @@ namespace DemonLord.Presentation.Exploration
         private DialogueSequence activeSequence;
         private InteractionSensor sourceSensor;
         private IDisposable gateToken;
-        private IDisposable cameraOverride;
         private PlayerFacingState playerFacingState;
         private PlayerFacingState npcFacingState;
         private bool hasPlayerFacingState;
@@ -28,6 +26,13 @@ namespace DemonLord.Presentation.Exploration
         private int lineIndex;
         private int startedFrame = -1;
         private bool ending;
+        private GameObject explorationHudRoot;
+        private GameObject mapHudRoot;
+        private GameObject interactionPromptRoot;
+        private bool hudVisibilityCaptured;
+        private bool explorationHudWasActive;
+        private bool mapHudWasActive;
+        private bool interactionPromptWasActive;
 
         public event Action<PrototypeInteractable> DialogueCompleted;
 
@@ -50,6 +55,7 @@ namespace DemonLord.Presentation.Exploration
             if (dialogueView != null)
             {
                 dialogueView.PresentationDisabled += OnDialoguePresentationDisabled;
+                dialogueView.AutoAdvanceRequested += OnAutoAdvanceRequested;
             }
         }
 
@@ -88,14 +94,15 @@ namespace DemonLord.Presentation.Exploration
             if (dialogueView != null)
             {
                 dialogueView.PresentationDisabled -= OnDialoguePresentationDisabled;
+                dialogueView.AutoAdvanceRequested -= OnAutoAdvanceRequested;
             }
 
-            EndDialogue();
+            EndDialogue(false);
         }
 
         private void OnDestroy()
         {
-            EndDialogue();
+            EndDialogue(false);
         }
 
         public bool TryBeginDialogue(PrototypeInteractable interactable, InteractionSensor sensor)
@@ -110,7 +117,6 @@ namespace DemonLord.Presentation.Exploration
             bool hasSequence = sequence != null && sequence.IsValid();
             if ((!hasSequence && (lines == null || lines.Length == 0))
                 || inputReader == null
-                || cameraRig == null
                 || playerFacing == null)
             {
                 return false;
@@ -158,13 +164,6 @@ namespace DemonLord.Presentation.Exploration
                     npcFacing.FaceTargetExact(player.position);
                 }
 
-                Transform playerTransform = playerRoot != null ? playerRoot : playerFacing.transform;
-                cameraOverride = cameraRig.PushDialogueOverride(
-                    playerTransform,
-                    focus,
-                    interactable.DialogueCameraAnchor,
-                    interactable.DialogueOrthographicSize);
-
                 sourceSensor?.ClearSelection();
                 RenderLine();
                 SetDialogueVisible(true);
@@ -193,6 +192,16 @@ namespace DemonLord.Presentation.Exploration
                 return;
             }
 
+            if (dialogueView != null && dialogueView.TryCloseHistory())
+            {
+                return;
+            }
+
+            if (dialogueView != null && dialogueView.TryCompleteReveal())
+            {
+                return;
+            }
+
             lineIndex++;
             int lineCount = activeSequence != null ? activeSequence.LineCount : activeInteractable.DialogueLines.Length;
             if (lineIndex >= lineCount)
@@ -206,7 +215,22 @@ namespace DemonLord.Presentation.Exploration
 
         public void EndDialogue()
         {
+            if (dialogueView != null && dialogueView.TryCloseHistory())
+            {
+                return;
+            }
+
             EndDialogue(false);
+        }
+
+        public void SkipDialogue()
+        {
+            if (!IsDialogueActive)
+            {
+                return;
+            }
+
+            EndDialogue(true);
         }
 
         private void EndDialogue(bool completed)
@@ -216,7 +240,7 @@ namespace DemonLord.Presentation.Exploration
                 return;
             }
 
-            if (!sessionActive && gateToken == null && cameraOverride == null)
+            if (!sessionActive && gateToken == null)
             {
                 SetDialogueVisible(false);
                 return;
@@ -228,8 +252,6 @@ namespace DemonLord.Presentation.Exploration
             try
             {
                 SetDialogueVisible(false);
-                SafeDispose(ref cameraOverride);
-
                 if (hasPlayerFacingState && playerFacing != null)
                 {
                     playerFacing.RestoreState(playerFacingState);
@@ -308,6 +330,7 @@ namespace DemonLord.Presentation.Exploration
 
         private void SetDialogueVisible(bool visible)
         {
+            SetExplorationHudVisible(!visible);
             if (dialogueView != null)
             {
                 if (!visible)
@@ -332,12 +355,51 @@ namespace DemonLord.Presentation.Exploration
             dialogueCanvasGroup.blocksRaycasts = false;
         }
 
+        private void SetExplorationHudVisible(bool visible)
+        {
+            ResolveHudRoots();
+            if (!visible)
+            {
+                if (!hudVisibilityCaptured)
+                {
+                    explorationHudWasActive = explorationHudRoot != null && explorationHudRoot.activeSelf;
+                    mapHudWasActive = mapHudRoot != null && mapHudRoot.activeSelf;
+                    interactionPromptWasActive = interactionPromptRoot != null && interactionPromptRoot.activeSelf;
+                    hudVisibilityCaptured = true;
+                }
+
+                if (explorationHudRoot != null) explorationHudRoot.SetActive(false);
+                if (mapHudRoot != null) mapHudRoot.SetActive(false);
+                if (interactionPromptRoot != null) interactionPromptRoot.SetActive(false);
+                return;
+            }
+
+            if (!hudVisibilityCaptured) return;
+            if (explorationHudRoot != null) explorationHudRoot.SetActive(explorationHudWasActive);
+            if (mapHudRoot != null) mapHudRoot.SetActive(mapHudWasActive);
+            if (interactionPromptRoot != null) interactionPromptRoot.SetActive(interactionPromptWasActive);
+            hudVisibilityCaptured = false;
+        }
+
+        private void ResolveHudRoots()
+        {
+            Transform canvasRoot = transform;
+            explorationHudRoot ??= canvasRoot.Find("SafeAreaRoot")?.gameObject;
+            mapHudRoot ??= canvasRoot.Find("__AreaSystemMapUi")?.gameObject;
+            interactionPromptRoot ??= canvasRoot.Find("InteractionPrompt")?.gameObject;
+        }
+
         private void OnDialoguePresentationDisabled()
         {
             if (IsDialogueActive)
             {
                 EndDialogue();
             }
+        }
+
+        private void OnAutoAdvanceRequested()
+        {
+            if (IsDialogueActive) AdvanceDialogue();
         }
 
         private static void SafeDispose(ref IDisposable handle)

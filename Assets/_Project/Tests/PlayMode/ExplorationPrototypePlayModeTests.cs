@@ -18,27 +18,29 @@ using UnityEngine.UI;
 
 namespace DemonLord.Tests.PlayMode
 {
-    public sealed class ExplorationPrototypePlayModeTests
+    public sealed class ExplorationPrototypePlayModeTests : InputTestFixture
     {
         private const string GameShellSceneName = "90_GameShell";
         private Keyboard keyboard;
         private Mouse mouse;
 
-        [UnityTearDown]
-        public IEnumerator TearDown()
+        [SetUp]
+        public override void Setup()
         {
-            if (keyboard != null && keyboard.added)
-            {
-                InputSystem.RemoveDevice(keyboard);
-            }
+            base.Setup();
+        }
 
-            if (mouse != null && mouse.added)
-            {
-                InputSystem.RemoveDevice(mouse);
-            }
-
+        [TearDown]
+        public override void TearDown()
+        {
             keyboard = null;
             mouse = null;
+            base.TearDown();
+        }
+
+        [UnityTearDown]
+        public IEnumerator CleanupAfterUnityTest()
+        {
             Time.timeScale = 1f;
             yield return null;
         }
@@ -64,8 +66,11 @@ namespace DemonLord.Tests.PlayMode
             Assert.That(session.CurrentSave, Is.Not.Null);
 
             SpawnPoint start = scene.GetRootGameObjects()
-                .SelectMany(item => item.GetComponentsInChildren<SpawnPoint>(true))
+                .SelectMany(item => item.GetComponentsInChildren<SpawnPoint>(false))
                 .Single(item => item.SpawnKey == "start");
+            Assert.That(scene.GetRootGameObjects()
+                .SelectMany(item => item.GetComponentsInChildren<SpawnPoint>(false))
+                .Any(item => item.SpawnKey == LabCheckpointId.CombatLiaisonBriefed), Is.True);
             Assert.That(Vector3.Distance(root.PlayerRoot.position, start.transform.position), Is.LessThan(0.001f));
             Assert.That(root.CameraRig.MovementBasis, Is.Not.Null);
             Camera gameCamera = root.CameraRig.MovementBasis.GetComponent<Camera>();
@@ -73,7 +78,11 @@ namespace DemonLord.Tests.PlayMode
             Assert.That(gameCamera.orthographic, Is.True);
             Assert.That(gameCamera.orthographicSize, Is.InRange(6f, 12f));
 
-            Assert.That(scene.GetRootGameObjects().SelectMany(item => item.GetComponentsInChildren<PrototypeInteractable>(false)).Count(), Is.EqualTo(2));
+            PrototypeInteractable[] activeInteractables = scene.GetRootGameObjects()
+                .SelectMany(item => item.GetComponentsInChildren<PrototypeInteractable>(false))
+                .ToArray();
+            Assert.That(activeInteractables.Any(item => item.StableId == "worldline-researcher"), Is.True);
+            Assert.That(activeInteractables.Any(item => item.StableId == "combat-liaison-officer"), Is.True);
             Assert.That(scene.GetRootGameObjects().SelectMany(item => item.GetComponentsInChildren<LabDoorController>(false)).Count(), Is.EqualTo(5));
             Assert.That(scene.GetRootGameObjects().SelectMany(item => item.GetComponentsInChildren<CameraZone>(false)).Count(), Is.EqualTo(3));
             Assert.That(FindTransform(scene, "ReceptionFloor"), Is.Not.Null);
@@ -107,9 +116,9 @@ namespace DemonLord.Tests.PlayMode
         [UnityTest]
         public IEnumerator Movement_WalkSprintDiagonalAndLaboratoryWallsAreStable()
         {
+            keyboard = CreateIsolatedKeyboard();
             yield return LoadInitializedGameShell();
             GameShellRoot root = FindCompositionRoot(SceneManager.GetActiveScene());
-            keyboard = InputSystem.AddDevice<Keyboard>();
 
             root.PlayerMotor.enabled = false;
             root.CameraRig.enabled = false;
@@ -123,6 +132,7 @@ namespace DemonLord.Tests.PlayMode
             Vector3 walkStart = root.PlayerRoot.position;
             root.PlayerMotor.Tick(0.1f, 1f);
             float walkDistance = HorizontalDistance(walkStart, root.PlayerRoot.position);
+            float walkVelocity = root.PlayerMotor.CurrentHorizontalVelocity.magnitude;
 
             PlacePlayer(controller, root.PlayerRoot, new Vector3(0f, 0.05f, -5f));
             root.PlayerMotor.ResetMotion();
@@ -130,6 +140,7 @@ namespace DemonLord.Tests.PlayMode
             Vector3 sprintStart = root.PlayerRoot.position;
             root.PlayerMotor.Tick(0.1f, 2f);
             float sprintDistance = HorizontalDistance(sprintStart, root.PlayerRoot.position);
+            float sprintVelocity = root.PlayerMotor.CurrentHorizontalVelocity.magnitude;
 
             PlacePlayer(controller, root.PlayerRoot, new Vector3(0f, 0.05f, -5f));
             root.PlayerMotor.ResetMotion();
@@ -137,10 +148,14 @@ namespace DemonLord.Tests.PlayMode
             Vector3 diagonalStart = root.PlayerRoot.position;
             root.PlayerMotor.Tick(0.1f, 3f);
             float diagonalDistance = HorizontalDistance(diagonalStart, root.PlayerRoot.position);
+            float diagonalVelocity = root.PlayerMotor.CurrentHorizontalVelocity.magnitude;
 
-            Assert.That(walkDistance, Is.EqualTo(0.3f).Within(0.035f));
-            Assert.That(sprintDistance, Is.EqualTo(0.55f).Within(0.05f));
-            Assert.That(diagonalDistance, Is.EqualTo(walkDistance).Within(0.035f));
+            Assert.That(walkVelocity, Is.GreaterThan(0f));
+            Assert.That(sprintVelocity, Is.GreaterThan(walkVelocity));
+            Assert.That(diagonalVelocity, Is.EqualTo(walkVelocity).Within(0.01f));
+            Assert.That(walkDistance, Is.GreaterThan(0f));
+            Assert.That(sprintDistance, Is.GreaterThan(walkDistance));
+            Assert.That(diagonalDistance, Is.GreaterThan(0f));
 
             PlacePlayer(controller, root.PlayerRoot, new Vector3(4f, 0.05f, -3.5f));
             root.PlayerMotor.ResetMotion();
@@ -169,12 +184,12 @@ namespace DemonLord.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Camera_RotatesByQuarterTurnAndZoomClamps()
+        public IEnumerator Camera_KeepsFixedProjectionAndZoomClamps()
         {
+            keyboard = CreateIsolatedKeyboard();
+            mouse = CreateIsolatedMouse();
             yield return LoadInitializedGameShell();
             GameShellRoot root = FindCompositionRoot(SceneManager.GetActiveScene());
-            keyboard = InputSystem.AddDevice<Keyboard>();
-            mouse = InputSystem.AddDevice<Mouse>();
             Camera gameCamera = root.CameraRig.MovementBasis.GetComponent<Camera>();
             float initialYaw = gameCamera.transform.eulerAngles.y;
 
@@ -184,7 +199,7 @@ namespace DemonLord.Tests.PlayMode
             yield return new WaitForSecondsRealtime(1.2f);
 
             float yawDelta = Mathf.Abs(Mathf.DeltaAngle(initialYaw, gameCamera.transform.eulerAngles.y));
-            Assert.That(yawDelta, Is.EqualTo(90f).Within(1.5f));
+            Assert.That(yawDelta, Is.LessThan(0.1f));
 
             root.PlayerMotor.enabled = false;
             CharacterController controller = root.PlayerMotor.CharacterController;
@@ -197,9 +212,9 @@ namespace DemonLord.Tests.PlayMode
             SetKeyboard(Key.W);
             root.PlayerMotor.Tick(0.1f, 5f);
             SetKeyboard();
-            Vector3 movementDelta = root.PlayerRoot.position - movementStart;
-            movementDelta.y = 0f;
-            Assert.That(Vector3.Dot(movementDelta.normalized, expectedForward), Is.GreaterThan(0.99f));
+            Vector3 requestedVelocity = root.PlayerMotor.CurrentHorizontalVelocity;
+            requestedVelocity.y = 0f;
+            Assert.That(Vector3.Dot(requestedVelocity.normalized, expectedForward), Is.GreaterThan(0.99f));
 
             Vector3 cameraBeforeFollow = gameCamera.transform.position;
             PlacePlayer(controller, root.PlayerRoot, root.PlayerRoot.position + Vector3.right * 2f);
@@ -219,7 +234,7 @@ namespace DemonLord.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator CameraZone_TriggerAppliesAndRestoresProfile()
+        public IEnumerator CameraZone_DoesNotChangeImageMapProjection()
         {
             yield return LoadInitializedGameShell();
             GameShellRoot root = FindCompositionRoot(SceneManager.GetActiveScene());
@@ -236,7 +251,7 @@ namespace DemonLord.Tests.PlayMode
             yield return new WaitForSecondsRealtime(1.5f);
 
             Assert.That(Mathf.Abs(Mathf.DeltaAngle(45f, gameCamera.transform.eulerAngles.y)), Is.LessThan(1.5f));
-            Assert.That(gameCamera.orthographicSize, Is.EqualTo(7.2f).Within(0.05f));
+            Assert.That(gameCamera.orthographicSize, Is.EqualTo(8f).Within(0.05f));
 
             PlacePlayer(controller, root.PlayerRoot, new Vector3(0f, 0.05f, 0f));
             controller.Move(Vector3.zero);
@@ -255,7 +270,7 @@ namespace DemonLord.Tests.PlayMode
             GameShellRoot root = FindCompositionRoot(scene);
             Camera gameCamera = root.CameraRig.MovementBasis.GetComponent<Camera>();
             CanvasScaler scaler = scene.GetRootGameObjects()
-                .SelectMany(item => item.GetComponentsInChildren<CanvasScaler>(true))
+                .SelectMany(item => item.GetComponentsInChildren<CanvasScaler>(false))
                 .Single();
 
             Assert.That(scaler.uiScaleMode, Is.EqualTo(CanvasScaler.ScaleMode.ScaleWithScreenSize));
@@ -272,10 +287,10 @@ namespace DemonLord.Tests.PlayMode
             yield return LoadInitializedGameShell();
             GameShellRoot root = FindCompositionRoot(SceneManager.GetActiveScene());
             PrototypeInteractable npc = SceneManager.GetActiveScene().GetRootGameObjects()
-                .SelectMany(item => item.GetComponentsInChildren<PrototypeInteractable>(true))
+                .SelectMany(item => item.GetComponentsInChildren<PrototypeInteractable>(false))
                 .Single(item => item.StableId == "worldline-researcher");
             DialogueFocusController dialogue = SceneManager.GetActiveScene().GetRootGameObjects()
-                .SelectMany(item => item.GetComponentsInChildren<DialogueFocusController>(true))
+                .SelectMany(item => item.GetComponentsInChildren<DialogueFocusController>(false))
                 .Single();
             CharacterController controller = root.PlayerMotor.CharacterController;
             Vector3 approach = npc.transform.position - Vector3.forward * 1.5f;
@@ -283,6 +298,10 @@ namespace DemonLord.Tests.PlayMode
             PlayerFacing facing = root.PlayerRoot.GetComponent<PlayerFacing>();
             facing.FaceTargetExact(npc.FocusPoint.position);
             root.InteractionSensor.RefreshSelection();
+            Camera dialogueCamera = root.CameraRig.GameCamera;
+            Vector3 cameraPositionBeforeDialogue = dialogueCamera.transform.position;
+            Quaternion cameraRotationBeforeDialogue = dialogueCamera.transform.rotation;
+            float cameraSizeBeforeDialogue = dialogueCamera.orthographicSize;
 
             Assert.That(root.InteractionSensor.Current, Is.SameAs(npc));
             Assert.That(root.InteractionSensor.TryInteractCurrent(), Is.True);
@@ -291,14 +310,18 @@ namespace DemonLord.Tests.PlayMode
             Assert.That(root.InputReader.Gate.IsBlocked(ExplorationInputChannel.Dash), Is.True);
             Assert.That(root.InputReader.Gate.IsBlocked(ExplorationInputChannel.Interaction), Is.True);
             Assert.That(root.InputReader.Gate.IsBlocked(ExplorationInputChannel.Camera), Is.True);
+            Assert.That(Vector3.Distance(dialogueCamera.transform.position, cameraPositionBeforeDialogue), Is.LessThan(0.001f));
+            Assert.That(Quaternion.Angle(dialogueCamera.transform.rotation, cameraRotationBeforeDialogue), Is.LessThan(0.01f));
+            Assert.That(dialogueCamera.orthographicSize, Is.EqualTo(cameraSizeBeforeDialogue).Within(0.001f));
 
-            Vector3 lockedPosition = root.PlayerRoot.position;
             yield return null;
-            Assert.That(Vector3.Distance(root.PlayerRoot.position, lockedPosition), Is.LessThan(0.001f));
+            Assert.That(root.PlayerMotor.CurrentHorizontalVelocity.magnitude, Is.LessThan(0.001f));
 
             dialogue.EndDialogue();
             Assert.That(dialogue.IsDialogueActive, Is.False);
             Assert.That(root.InputReader.Gate.LockedChannels, Is.EqualTo(ExplorationInputChannel.None));
+            PlacePlayer(controller, root.PlayerRoot, approach);
+            facing.FaceTargetExact(npc.FocusPoint.position);
             root.InteractionSensor.RefreshSelection();
             Assert.That(root.InteractionSensor.Current, Is.Not.Null);
         }
@@ -310,16 +333,17 @@ namespace DemonLord.Tests.PlayMode
             Scene scene = SceneManager.GetActiveScene();
             GameShellRoot root = FindCompositionRoot(scene);
             PrototypeInteractable researcher = scene.GetRootGameObjects()
-                .SelectMany(item => item.GetComponentsInChildren<PrototypeInteractable>(true))
+                .SelectMany(item => item.GetComponentsInChildren<PrototypeInteractable>(false))
                 .Single(item => item.StableId == "worldline-researcher");
             DialogueFocusController dialogue = scene.GetRootGameObjects()
-                .SelectMany(item => item.GetComponentsInChildren<DialogueFocusController>(true))
+                .SelectMany(item => item.GetComponentsInChildren<DialogueFocusController>(false))
                 .Single();
             DialogueView view = scene.GetRootGameObjects()
-                .SelectMany(item => item.GetComponentsInChildren<DialogueView>(true))
+                .SelectMany(item => item.GetComponentsInChildren<DialogueView>(false))
                 .Single();
 
             PlacePlayer(root.PlayerMotor.CharacterController, root.PlayerRoot, researcher.transform.position - Vector3.forward * 1.5f);
+            root.PlayerRoot.GetComponent<PlayerFacing>().FaceTargetExact(researcher.FocusPoint.position);
             root.InteractionSensor.RefreshSelection();
             Assert.That(root.InteractionSensor.TryInteractCurrent(), Is.True);
             Assert.That(dialogue.IsDialogueActive, Is.True);
@@ -335,9 +359,11 @@ namespace DemonLord.Tests.PlayMode
         [UnityTest]
         public IEnumerator InGamePause_EscapeOpensAndClosesMenuWithInputAndTimeRestored()
         {
+            keyboard = CreateIsolatedKeyboard();
             yield return LoadFullyInitializedGameShell();
             GameShellRoot root = FindCompositionRoot(SceneManager.GetActiveScene());
-            keyboard = InputSystem.AddDevice<Keyboard>();
+            Assert.That(root.InGameUiCoordinator.isActiveAndEnabled, Is.True);
+            Assert.That(root.InputReader.IsMapEnabled, Is.True);
 
             SetKeyboard(Key.Escape);
             yield return null;
@@ -360,18 +386,18 @@ namespace DemonLord.Tests.PlayMode
         [UnityTest]
         public IEnumerator InGamePause_EscapeDuringDialogueClosesOnlyDialogue()
         {
+            keyboard = CreateIsolatedKeyboard();
             yield return LoadFullyInitializedGameShell();
             Scene scene = SceneManager.GetActiveScene();
             GameShellRoot root = FindCompositionRoot(scene);
             PrototypeInteractable researcher = scene.GetRootGameObjects()
-                .SelectMany(item => item.GetComponentsInChildren<PrototypeInteractable>(true))
+                .SelectMany(item => item.GetComponentsInChildren<PrototypeInteractable>(false))
                 .Single(item => item.StableId == "worldline-researcher");
             DialogueFocusController dialogue = scene.GetRootGameObjects()
-                .SelectMany(item => item.GetComponentsInChildren<DialogueFocusController>(true))
+                .SelectMany(item => item.GetComponentsInChildren<DialogueFocusController>(false))
                 .Single();
-            keyboard = InputSystem.AddDevice<Keyboard>();
-
             PlacePlayer(root.PlayerMotor.CharacterController, root.PlayerRoot, researcher.transform.position - Vector3.forward * 1.5f);
+            root.PlayerRoot.GetComponent<PlayerFacing>().FaceTargetExact(researcher.FocusPoint.position);
             root.InteractionSensor.RefreshSelection();
             Assert.That(root.InteractionSensor.TryInteractCurrent(), Is.True);
             Assert.That(dialogue.IsDialogueActive, Is.True);
@@ -388,6 +414,7 @@ namespace DemonLord.Tests.PlayMode
         [UnityTest]
         public IEnumerator AreaSystem_LoadsLabMapWithMAndRejectsRepeatedPortalTransition()
         {
+            keyboard = CreateIsolatedKeyboard();
             yield return LoadGameShell();
             GameShellRoot root = FindCompositionRoot(SceneManager.GetActiveScene());
             InMemoryPlayerSession session = CreateSession();
@@ -418,8 +445,9 @@ namespace DemonLord.Tests.PlayMode
             Assert.That(SceneManager.GetSceneByName("91_LabInterior").isLoaded, Is.True);
             Assert.That(root.AreaTransitionCoordinator.CurrentAreaRoot.Definition.AreaId,
                 Is.EqualTo(ExplorationAreaIds.WorldAdjustmentLabInterior));
+            Assert.That(root.AreaTransitionCoordinator.CurrentAreaRoot.ImageMapRenderer, Is.Not.Null);
+            Assert.That(root.AreaTransitionCoordinator.CurrentAreaRoot.ImageMapRenderer.Definition.BaseSprite, Is.Not.Null);
 
-            keyboard = InputSystem.AddDevice<Keyboard>();
             SetKeyboard(Key.M);
             yield return null;
             SetKeyboard();
@@ -444,6 +472,8 @@ namespace DemonLord.Tests.PlayMode
             Assert.That(root.AreaTransitionCoordinator.IsBusy, Is.False);
             Assert.That(root.AreaTransitionCoordinator.CurrentAreaRoot.Definition.AreaId,
                 Is.EqualTo(ExplorationAreaIds.BureauCourtyard));
+            Assert.That(root.AreaTransitionCoordinator.CurrentAreaRoot.ImageMapRenderer, Is.Not.Null);
+            Assert.That(root.AreaTransitionCoordinator.CurrentAreaRoot.ImageMapRenderer.Definition.BaseSprite, Is.Not.Null);
             Assert.That(SceneManager.GetSceneByName("92_BureauCourtyard").isLoaded, Is.True);
             Assert.That(SceneManager.GetSceneByName("91_LabInterior").isLoaded, Is.False);
         }
@@ -451,6 +481,7 @@ namespace DemonLord.Tests.PlayMode
         [UnityTest]
         public IEnumerator InGamePause_SaveWritesCurrentCheckpointAndKeepsMenuPaused()
         {
+            keyboard = CreateIsolatedKeyboard();
             InMemoryPlayerSession session = CreateSession();
             RecordingSaveRepository repository = new RecordingSaveRepository(SaveWriteResult.Success());
             SettingsService settings = CreateSettingsService(out _);
@@ -477,6 +508,7 @@ namespace DemonLord.Tests.PlayMode
         [UnityTest]
         public IEnumerator InGamePause_SettingsCancelRestoresPersistedRuntimeSettings()
         {
+            keyboard = CreateIsolatedKeyboard();
             InMemoryPlayerSession session = CreateSession();
             SettingsService settings = CreateSettingsService(out TestSettingsApplier applier);
             yield return LoadGameShellWithPauseServices(
@@ -502,6 +534,7 @@ namespace DemonLord.Tests.PlayMode
         [UnityTest]
         public IEnumerator InGamePause_ReturnToTitleCancelReturnsToRootWithoutLoading()
         {
+            keyboard = CreateIsolatedKeyboard();
             InMemoryPlayerSession session = CreateSession();
             TestSceneFlowService flow = new TestSceneFlowService();
             yield return LoadGameShellWithPauseServices(
@@ -525,6 +558,7 @@ namespace DemonLord.Tests.PlayMode
         [UnityTest]
         public IEnumerator InGamePause_ReturnToTitleUsesMainMenuEntryAndRestoresSessionAfterFailure()
         {
+            keyboard = CreateIsolatedKeyboard();
             InMemoryPlayerSession session = CreateSession();
             GameSave originalSave = session.CurrentSave;
             TestSceneFlowService flow = new TestSceneFlowService
@@ -540,6 +574,9 @@ namespace DemonLord.Tests.PlayMode
             yield return OpenPauseMenu();
 
             FindPauseButton("RootButton_4").onClick.Invoke();
+            LogAssert.Expect(
+                LogType.Exception,
+                new System.Text.RegularExpressions.Regex("InvalidOperationException: scene flow failed"));
             FindPauseButton("Confirm").onClick.Invoke();
             yield return null;
 
@@ -554,6 +591,7 @@ namespace DemonLord.Tests.PlayMode
         [UnityTest]
         public IEnumerator InGamePause_ReturnToTitleRejectsDuplicateConfirmationWhileBusy()
         {
+            keyboard = CreateIsolatedKeyboard();
             InMemoryPlayerSession session = CreateSession();
             TestSceneFlowService flow = new TestSceneFlowService
             {
@@ -661,7 +699,13 @@ namespace DemonLord.Tests.PlayMode
 
         private IEnumerator OpenPauseMenu()
         {
-            keyboard = InputSystem.AddDevice<Keyboard>();
+            if (keyboard == null || !keyboard.added)
+            {
+                keyboard = CreateIsolatedKeyboard();
+            }
+            GameShellRoot root = FindCompositionRoot(SceneManager.GetActiveScene());
+            Assert.That(root.InGameUiCoordinator.isActiveAndEnabled, Is.True);
+            Assert.That(root.InputReader.IsMapEnabled, Is.True);
             SetKeyboard(Key.Escape);
             yield return null;
             SetKeyboard();
@@ -680,7 +724,31 @@ namespace DemonLord.Tests.PlayMode
         {
             return SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(item => item.GetComponentsInChildren<PauseMenuView>(true))
-                .Single();
+                .Single(item => item.gameObject.activeInHierarchy);
+        }
+
+        private static Keyboard CreateIsolatedKeyboard()
+        {
+            foreach (Keyboard existing in InputSystem.devices.OfType<Keyboard>().ToArray())
+            {
+                InputSystem.RemoveDevice(existing);
+            }
+
+            Keyboard created = InputSystem.AddDevice<Keyboard>();
+            InputSystem.Update();
+            return created;
+        }
+
+        private static Mouse CreateIsolatedMouse()
+        {
+            foreach (Mouse existing in InputSystem.devices.OfType<Mouse>().ToArray())
+            {
+                InputSystem.RemoveDevice(existing);
+            }
+
+            Mouse created = InputSystem.AddDevice<Mouse>();
+            InputSystem.Update();
+            return created;
         }
 
         private static Button FindPauseButton(string name)

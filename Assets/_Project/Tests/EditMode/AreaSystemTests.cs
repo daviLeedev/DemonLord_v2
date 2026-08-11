@@ -125,6 +125,92 @@ namespace DemonLord.Tests.EditMode
             Assert.That(MapProjection.TryWorldToNormalized(Vector3.zero, floor, out _), Is.False);
         }
 
+        [Test]
+        public void MapProjection_RotatesMarkerAgainstMapAxes()
+        {
+            MapFloorDefinition topDown = CreateFloor(
+                "top-down",
+                Vector3.zero,
+                Vector3.right,
+                Vector3.forward,
+                new Vector2(20f, 20f));
+            Assert.That(
+                MapProjection.CalculateMarkerRotationDegrees(0f, topDown, new Vector2(200f, 200f)),
+                Is.EqualTo(0f).Within(0.001f));
+            Assert.That(
+                MapProjection.CalculateMarkerRotationDegrees(90f, topDown, new Vector2(200f, 200f)),
+                Is.EqualTo(-90f).Within(0.001f));
+
+            MapFloorDefinition isometric = CreateFloor(
+                "isometric",
+                LabNavigationPresentationContract.MapImageWorldOrigin,
+                LabNavigationPresentationContract.MapImageAxisX,
+                LabNavigationPresentationContract.MapImageAxisY,
+                LabNavigationPresentationContract.MapImageWorldSize);
+            Assert.That(
+                MapProjection.CalculateMarkerRotationDegrees(
+                    LabNavigationPresentationContract.ReferenceYaw,
+                    isometric,
+                    new Vector2(
+                        LabNavigationPresentationContract.OutputWidth,
+                        LabNavigationPresentationContract.OutputHeight)),
+                Is.EqualTo(0f).Within(0.001f));
+        }
+
+        [Test]
+        public void CourtyardMapContract_ProjectsReferenceCenterToImageCenter()
+        {
+            MapFloorDefinition courtyard = CreateFloor(
+                "ground",
+                CourtyardNavigationPresentationContract.MapImageWorldOrigin,
+                CourtyardNavigationPresentationContract.MapImageAxisX,
+                CourtyardNavigationPresentationContract.MapImageAxisY,
+                CourtyardNavigationPresentationContract.MapImageWorldSize);
+
+            AssertProjected(
+                courtyard,
+                CourtyardNavigationPresentationContract.ReferenceWorldCenter,
+                new Vector2(0.5f, 0.5f));
+            Assert.That(CourtyardNavigationPresentationContract.MapImageWorldSize.x, Is.GreaterThan(0f));
+            Assert.That(CourtyardNavigationPresentationContract.MapImageWorldSize.y, Is.GreaterThan(0f));
+        }
+
+        [Test]
+        public void BattleLaunchRequest_PreservesBattleAndReturnContext()
+        {
+            Assert.That(
+                ExplorationLocation.TryCreate(
+                    ExplorationAreaIds.WorldAdjustmentLabInterior,
+                    ExplorationSpawnIds.ReceptionStart,
+                    out ExplorationLocation returnLocation,
+                    out string errorCode),
+                Is.True,
+                errorCode);
+
+            BattleLaunchRequest request = new BattleLaunchRequest(
+                "lab-first-contact",
+                "adjustment-anomaly-alpha",
+                returnLocation);
+
+            Assert.That(request.BattleId, Is.EqualTo("lab-first-contact"));
+            Assert.That(request.EnemyGroupId, Is.EqualTo("adjustment-anomaly-alpha"));
+            Assert.That(request.ReturnLocation, Is.SameAs(returnLocation));
+            Assert.Throws<ArgumentException>(() => new BattleLaunchRequest("Bad Battle", "enemy", returnLocation));
+            Assert.Throws<ArgumentNullException>(() => new BattleLaunchRequest("battle", "enemy", null));
+        }
+
+        [Test]
+        public void LabObjectiveState_UsesStableValueEquality()
+        {
+            LabObjectiveState first = new LabObjectiveState(2, "분류 장부 조사", "archive-catalog", false);
+            LabObjectiveState same = new LabObjectiveState(2, "분류 장부 조사", "archive-catalog", false);
+            LabObjectiveState completed = new LabObjectiveState(4, "현재 업무 완료", string.Empty, true);
+
+            Assert.That(first, Is.EqualTo(same));
+            Assert.That(first.GetHashCode(), Is.EqualTo(same.GetHashCode()));
+            Assert.That(first, Is.Not.EqualTo(completed));
+        }
+
         private static void AssertProjected(MapFloorDefinition floor, Vector3 world, Vector2 expected)
         {
             Assert.That(MapProjection.TryWorldToNormalized(world, floor, out Vector2 actual), Is.True);

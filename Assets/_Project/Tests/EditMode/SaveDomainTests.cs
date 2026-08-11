@@ -9,6 +9,16 @@ namespace DemonLord.Tests.EditMode
 {
     public sealed class SaveDomainTests
     {
+        [TestCase(LabCheckpointId.Start)]
+        [TestCase(LabCheckpointId.ResearcherBriefed)]
+        [TestCase(LabCheckpointId.TaxLedgerReviewed)]
+        [TestCase(LabCheckpointId.ArchiveCatalogued)]
+        [TestCase(LabCheckpointId.CombatLiaisonBriefed)]
+        public void LabCheckpointId_AcceptsEveryPersistedLaboratoryStage(string checkpointId)
+        {
+            Assert.That(LabCheckpointId.IsKnown(checkpointId), Is.True);
+        }
+
         [TestCase(" story ", "story")]
         [TestCase("normal", "normal")]
         [TestCase("hard", "hard")]

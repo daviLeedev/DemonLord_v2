@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: WorldAdjustmentLabDialogueTheme
   m_EditorClassIdentifier: DemonLord.Runtime::DemonLord.Presentation.Exploration.DialogueTheme
   font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-  bodyFontSize: 36
-  nameFontSize: 30
-  bodyColor: {r: 0.95, g: 0.92, b: 0.84, a: 1}
-  playerAccent: {r: 0.45, g: 0.78, b: 1, a: 1}
-  partnerAccent: {r: 0.82, g: 0.58, b: 1, a: 1}
-  inactivePortraitAlpha: 0.55
+  bodyFontSize: 32
+  nameFontSize: 28
+  bodyColor: {r: 0.94, g: 0.95, b: 0.98, a: 1}
+  playerAccent: {r: 0.4, g: 0.78, b: 0.91, a: 1}
+  partnerAccent: {r: 0.78, g: 0.66, b: 0.96, a: 1}
+  inactivePortraitAlpha: 0.62

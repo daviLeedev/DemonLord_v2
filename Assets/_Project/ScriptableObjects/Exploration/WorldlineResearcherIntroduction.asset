@@ -15,11 +15,11 @@ MonoBehaviour:
   player:
     speakerId: tax-officer
     displayName: "\uC138\uBB34\uAD00"
-    portrait: {fileID: 21300000, guid: e93220171d911ee4b9ef649a4f051704, type: 3}
+    portrait: {fileID: 21300000, guid: e7b7bf8011753304189594089264c265, type: 3}
   partner:
     speakerId: worldline-researcher
     displayName: "\uC138\uACC4\uC120 \uBD84\uC11D \uC5F0\uAD6C\uC6D0"
-    portrait: {fileID: 21300000, guid: f9541fc62dba6ca419ad04fd0795fa7a, type: 3}
+    portrait: {fileID: 21300000, guid: 53b84f37ebdb76947b5fe4fd8b50b454, type: 3}
   lines:
   - speakerSide: 1
     text: "\uC138\uBB34\uAD00\uB2D8, \uC81C3\uAD00\uCE21\uC2E4\uC758 \uC138\uACC4\uC120

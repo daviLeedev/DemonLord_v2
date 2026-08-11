@@ -78,6 +78,11 @@ namespace DemonLord.Editor
         [MenuItem("DemonLord/Bootstrap/Use Boot Scene for Play Mode")]
         public static void EnsurePlayModeStartScene()
         {
+            if (SessionState.GetBool("DemonLord.ExplorationPlayModeTests.Active", false))
+            {
+                return;
+            }
+
             SceneAsset bootScene = AssetDatabase.LoadAssetAtPath<SceneAsset>(SceneDefinitions[0].Path);
             if (bootScene == null)
             {

@@ -12,6 +12,7 @@ namespace DemonLord.Presentation.Exploration
         [SerializeField] private MiniMapView miniMapView;
         [SerializeField] private AreaMapView areaMapView;
         [SerializeField] private AreaTransitionCoordinator transitionCoordinator;
+        [SerializeField] private LabProgressController progressController;
         private AreaDefinition currentArea;
         private AreaRoot currentAreaRoot;
         private int selectedFloorIndex;
@@ -26,7 +27,8 @@ namespace DemonLord.Presentation.Exploration
             LocationTracker configuredLocationTracker,
             MiniMapView configuredMiniMapView,
             AreaMapView configuredAreaMapView,
-            AreaTransitionCoordinator configuredTransitionCoordinator)
+            AreaTransitionCoordinator configuredTransitionCoordinator,
+            LabProgressController configuredProgressController = null)
         {
             playerRoot = configuredPlayerRoot;
             playerFacing = configuredPlayerFacing;
@@ -34,6 +36,7 @@ namespace DemonLord.Presentation.Exploration
             miniMapView = configuredMiniMapView;
             areaMapView = configuredAreaMapView;
             transitionCoordinator = configuredTransitionCoordinator;
+            progressController = configuredProgressController;
         }
 
         public bool TryInitialize(out string errorCode)
@@ -46,6 +49,7 @@ namespace DemonLord.Presentation.Exploration
             }
 
             transitionCoordinator.AreaChanged += OnAreaChanged;
+            if (progressController != null) progressController.ObjectiveChanged += OnObjectiveChanged;
             if (transitionCoordinator.CurrentAreaRoot != null)
             {
                 OnAreaChanged(transitionCoordinator.CurrentAreaRoot.Definition, transitionCoordinator.CurrentAreaRoot);
@@ -99,13 +103,18 @@ namespace DemonLord.Presentation.Exploration
                 return;
             }
 
-            miniMapView.Render(floor, normalized, playerFacing.CurrentYaw);
+            Vector2? objectiveNormalized = TryResolveObjectiveTarget(out Transform objectiveTarget)
+                && MapProjection.TryWorldToNormalized(objectiveTarget.position, floor, out Vector2 projectedObjective)
+                    ? projectedObjective
+                    : (Vector2?)null;
+            miniMapView.Render(floor, normalized, playerFacing.CurrentYaw, objectiveNormalized);
             if (IsMapOpen) RenderAreaMap();
         }
 
         private void OnDestroy()
         {
             if (transitionCoordinator != null) transitionCoordinator.AreaChanged -= OnAreaChanged;
+            if (progressController != null) progressController.ObjectiveChanged -= OnObjectiveChanged;
         }
 
         private void OnDisable() => areaMapView?.Hide();
@@ -135,7 +144,29 @@ namespace DemonLord.Presentation.Exploration
                 playerRoot,
                 playerFacing,
                 zoom,
-                currentAreaRoot?.Portals);
+                currentAreaRoot?.Portals,
+                TryResolveObjectiveTarget(out Transform objectiveTarget) ? objectiveTarget : null,
+                progressController?.CurrentObjective.Title ?? string.Empty);
+        }
+
+        private void OnObjectiveChanged(LabObjectiveState state)
+        {
+            if (IsMapOpen) RenderAreaMap();
+        }
+
+        private bool TryResolveObjectiveTarget(out Transform target)
+        {
+            target = null;
+            string targetId = progressController?.CurrentObjective.TargetStableId;
+            if (currentAreaRoot == null || string.IsNullOrWhiteSpace(targetId)
+                || !currentAreaRoot.TryGetInteractable(targetId, out PrototypeInteractable interactable)
+                || interactable == null)
+            {
+                return false;
+            }
+
+            target = interactable.FocusPoint;
+            return target != null;
         }
 
         private bool TryGetActualFloor(out MapFloorDefinition floor)

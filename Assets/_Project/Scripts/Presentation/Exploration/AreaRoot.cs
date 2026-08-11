@@ -16,10 +16,17 @@ namespace DemonLord.Presentation.Exploration
         [SerializeField] private CameraZone[] cameraZones = Array.Empty<CameraZone>();
         [SerializeField] private PrototypeInteractable[] dialogueInteractables = Array.Empty<PrototypeInteractable>();
         [SerializeField] private LabDoorController[] doors = Array.Empty<LabDoorController>();
+        [SerializeField] private LayeredImageMapRenderer imageMapRenderer;
 
         public AreaDefinition Definition => definition;
         public IReadOnlyList<AreaSpawnPoint> SpawnPoints => spawnPoints ?? Array.Empty<AreaSpawnPoint>();
         public IReadOnlyList<AreaPortal> Portals => portals ?? Array.Empty<AreaPortal>();
+        public LayeredImageMapRenderer ImageMapRenderer => imageMapRenderer;
+
+        public void SetImageMapRenderer(LayeredImageMapRenderer configuredRenderer)
+        {
+            imageMapRenderer = configuredRenderer;
+        }
 
         public void Configure(
             AreaDefinition configuredDefinition,
@@ -85,6 +92,11 @@ namespace DemonLord.Presentation.Exploration
             if (!ids.Contains(definition.DefaultSpawnId))
             {
                 errorCode = "area_default_spawn_missing";
+                return false;
+            }
+
+            if (imageMapRenderer != null && !imageMapRenderer.TryValidate(out errorCode))
+            {
                 return false;
             }
 
@@ -157,6 +169,7 @@ namespace DemonLord.Presentation.Exploration
             foreach (CameraZone zone in cameraZones ?? Array.Empty<CameraZone>()) zone?.BindCameraRig(cameraRig);
             foreach (PrototypeInteractable interactable in dialogueInteractables ?? Array.Empty<PrototypeInteractable>()) interactable?.BindDialogueController(dialogueController);
             foreach (LabDoorController door in doors ?? Array.Empty<LabDoorController>()) door?.BindNotificationView(notificationView);
+            imageMapRenderer?.BindCamera(cameraRig.GameCamera);
         }
 
         private static T[] Clone<T>(T[] values)

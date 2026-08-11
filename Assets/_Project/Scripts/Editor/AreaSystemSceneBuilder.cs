@@ -21,6 +21,9 @@ namespace DemonLord.Editor
         private const string CourtyardScenePath = "Assets/_Project/Scenes/92_BureauCourtyard.unity";
         private const string DefinitionsFolder = "Assets/_Project/ScriptableObjects/Exploration/Areas";
         private const string MapArtFolder = "Assets/_Project/Art/Prototype/Maps";
+        private const string LabMiniMapTexturePath = "Assets/_Project/Art/Maps/Layered/WorldAdjustmentLab/world_adjustment_lab_base_v2.png";
+        private const string LabNavigationOverlayPath = "Assets/_Project/Art/Maps/Authoring/WorldAdjustmentLab/lab_navigation_overlay_v1.png";
+        private const string CourtyardMapTexturePath = "Assets/_Project/Art/Maps/Layered/BureauCourtyard/bureau_courtyard_base_v1.png";
         private const string ShellGeneratedRootName = "__AreaSystemShellGenerated";
         private const string AreaGeneratedRootName = "__AreaSystemGenerated";
         private const string WorldGeneratedRootName = "__WorldAdjustmentLabGenerated";
@@ -44,12 +47,14 @@ namespace DemonLord.Editor
 
             EnsureFolder(DefinitionsFolder);
             EnsureFolder(MapArtFolder);
-            CreateMapTexture(MapArtFolder + "/lab_interior_map.png", true);
             CreateMapTexture(MapArtFolder + "/bureau_courtyard_map.png", false);
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-            ConfigureMapTexture(MapArtFolder + "/lab_interior_map.png");
+            ConfigureMapTexture(LabMiniMapTexturePath);
+            ConfigureMapTexture(LabNavigationOverlayPath);
+            ConfigureMapTexture(CourtyardMapTexturePath);
             ConfigureMapTexture(MapArtFolder + "/bureau_courtyard_map.png");
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            LayeredImageMapSceneBuilder.PrepareAssets();
 
             AreaAssets assets = CreateAreaAssets();
             Scene shellScene = OpenScene(ShellScenePath, OpenSceneMode.Additive);
@@ -190,9 +195,10 @@ namespace DemonLord.Editor
 
         private static AreaAssets CreateAreaAssets()
         {
-            Sprite labMapSprite = AssetDatabase.LoadAssetAtPath<Sprite>(MapArtFolder + "/lab_interior_map.png");
-            Sprite courtyardMapSprite = AssetDatabase.LoadAssetAtPath<Sprite>(MapArtFolder + "/bureau_courtyard_map.png");
-            if (labMapSprite == null || courtyardMapSprite == null)
+            Sprite labMapSprite = AssetDatabase.LoadAssetAtPath<Sprite>(LabMiniMapTexturePath);
+            Sprite labNavigationOverlaySprite = AssetDatabase.LoadAssetAtPath<Sprite>(LabNavigationOverlayPath);
+            Sprite courtyardMapSprite = AssetDatabase.LoadAssetAtPath<Sprite>(CourtyardMapTexturePath);
+            if (labMapSprite == null || labNavigationOverlaySprite == null || courtyardMapSprite == null)
             {
                 throw new InvalidOperationException("Generated map sprites could not be imported.");
             }
@@ -203,11 +209,12 @@ namespace DemonLord.Editor
                 "floor-1",
                 "1층",
                 labMapSprite,
-                new Vector3(-15f, 0f, -14f),
-                Vector3.right,
-                Vector3.forward,
-                new Vector2(30f, 34f),
-                new Vector2(13f, 10f));
+                LabNavigationPresentationContract.MapImageWorldOrigin,
+                LabNavigationPresentationContract.MapImageAxisX,
+                LabNavigationPresentationContract.MapImageAxisY,
+                LabNavigationPresentationContract.MapImageWorldSize,
+                LabNavigationPresentationContract.MiniMapViewportWorldSize,
+                labNavigationOverlaySprite);
             labMap.Configure(new[] { labFloor });
 
             AreaMapDefinition courtyardMap = LoadOrCreate<AreaMapDefinition>(CourtyardMapAssetPath);
@@ -216,11 +223,11 @@ namespace DemonLord.Editor
                 "ground",
                 "지상",
                 courtyardMapSprite,
-                new Vector3(-16f, 0f, -12f),
-                Vector3.right,
-                Vector3.forward,
-                new Vector2(32f, 24f),
-                new Vector2(14f, 10f));
+                CourtyardNavigationPresentationContract.MapImageWorldOrigin,
+                CourtyardNavigationPresentationContract.MapImageAxisX,
+                CourtyardNavigationPresentationContract.MapImageAxisY,
+                CourtyardNavigationPresentationContract.MapImageWorldSize,
+                CourtyardNavigationPresentationContract.MiniMapViewportWorldSize);
             courtyardMap.Configure(new[] { courtyardFloor });
 
             AreaDefinition lab = LoadOrCreate<AreaDefinition>(DefinitionsFolder + "/LabInterior.asset");
@@ -337,6 +344,7 @@ namespace DemonLord.Editor
                     generated.GetComponentsInChildren<CameraZone>(true),
                     generated.GetComponentsInChildren<PrototypeInteractable>(true),
                     generated.GetComponentsInChildren<LabDoorController>(true));
+                areaRoot.SetImageMapRenderer(LayeredImageMapSceneBuilder.AttachLab(generated.transform, environment.transform));
                 MarkDirty(areaRoot, start, fromCourtyard, exitPortal, floorVolume);
                 EditorSceneManager.MarkSceneDirty(scene);
                 EditorSceneManager.SaveScene(scene, LabScenePath, false);
@@ -375,6 +383,12 @@ namespace DemonLord.Editor
                         new Vector3(0.8f, 2.5f, 0.8f),
                         trimMaterial);
                 }
+
+                Transform navigationMask = CreateObject("NavigationCollisionMask", generated.transform).transform;
+                CreateCollisionMask("WestGarden", navigationMask, new Vector3(-8.8f, 0.7f, 5.2f), new Vector3(7.2f, 1.4f, 4.6f));
+                CreateCollisionMask("EastGarden", navigationMask, new Vector3(8.2f, 0.7f, 5.0f), new Vector3(7.4f, 1.4f, 4.8f));
+                CreateCollisionMask("AdjustmentMonument", navigationMask, new Vector3(7.6f, 0.7f, 0.7f), new Vector3(3.2f, 1.4f, 3.2f));
+                CreateCollisionMask("SouthGateHouse", navigationMask, new Vector3(-10.4f, 0.7f, -8.4f), new Vector3(4.2f, 1.4f, 3.6f));
 
                 GameObject locationObject = CreateObject("Location_Courtyard", generated.transform);
                 locationObject.transform.position = new Vector3(0f, 1.5f, 0f);
@@ -426,6 +440,7 @@ namespace DemonLord.Editor
                     Array.Empty<CameraZone>(),
                     Array.Empty<PrototypeInteractable>(),
                     Array.Empty<LabDoorController>());
+                areaRoot.SetImageMapRenderer(LayeredImageMapSceneBuilder.AttachCourtyard(generated.transform));
                 MarkDirty(areaRoot, spawn, returnPortal, floorVolume, location, sun);
                 EditorSceneManager.MarkSceneDirty(scene);
                 EditorSceneManager.SaveScene(scene, CourtyardScenePath, false);
@@ -434,6 +449,15 @@ namespace DemonLord.Editor
             {
                 EditorSceneManager.CloseScene(scene, true);
             }
+        }
+
+        private static BoxCollider CreateCollisionMask(string name, Transform parent, Vector3 position, Vector3 size)
+        {
+            GameObject root = CreateObject(name, parent);
+            root.transform.position = position;
+            BoxCollider collider = root.AddComponent<BoxCollider>();
+            collider.size = size;
+            return collider;
         }
 
         private static void ConfigureShell(GameObject shellRoot, Transform sourceRoot, AreaRegistry registry)
@@ -457,6 +481,7 @@ namespace DemonLord.Editor
             DialogueFocusController dialogue = sourceRoot.GetComponentInChildren<DialogueFocusController>(true);
             NotificationView notification = sourceRoot.GetComponentInChildren<NotificationView>(true);
             InGameUiCoordinator inGameUi = sourceRoot.GetComponentInChildren<InGameUiCoordinator>(true);
+            LabProgressController progress = shellRoot.GetComponent<LabProgressController>();
             Canvas canvas = sourceRoot.GetComponentInChildren<Canvas>(true);
             if (player == null || cameraRig == null || camera == null || input == null || motor == null || facing == null
                 || controller == null || tracker == null || dialogue == null || notification == null || inGameUi == null || canvas == null)
@@ -486,7 +511,7 @@ namespace DemonLord.Editor
                 notification,
                 fade);
             MapCoordinator mapCoordinator = generated.AddComponent<MapCoordinator>();
-            mapCoordinator.Configure(player, facing, tracker, mapUi.MiniMap, mapUi.AreaMap, transition);
+            mapCoordinator.Configure(player, facing, tracker, mapUi.MiniMap, mapUi.AreaMap, transition, progress);
             PauseMenuView pauseView = sourceRoot.GetComponentInChildren<PauseMenuView>(true);
             inGameUi.Configure(input, dialogue, pauseView, mapCoordinator, transition);
 
@@ -555,21 +580,27 @@ namespace DemonLord.Editor
             Transform safeArea = generatedRoot.transform;
 
             GameObject miniRoot = CreatePanel("MiniMap", safeArea, new Color(0.035f, 0.055f, 0.08f, 0.94f));
-            SetRect(miniRoot.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(42f, -148f), new Vector2(300f, 210f), new Vector2(0f, 1f));
+            SetRect(miniRoot.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(42f, -270f), new Vector2(300f, 210f), new Vector2(0f, 1f));
             CanvasGroup miniGroup = miniRoot.AddComponent<CanvasGroup>();
             GameObject miniMask = CreatePanel("MapMask", miniRoot.transform, Color.white);
             SetRect(miniMask.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -5f), new Vector2(270f, 166f), new Vector2(0.5f, 0.5f));
             miniMask.AddComponent<Mask>().showMaskGraphic = false;
             RawImage miniImage = CreateRawImage("MapImage", miniMask.transform);
             Stretch(miniImage.rectTransform);
+            RawImage miniOverlay = CreateRawImage("NavigationOverlay", miniMask.transform);
+            miniOverlay.color = new Color(1f, 1f, 1f, 0.34f);
+            miniOverlay.raycastTarget = false;
+            Stretch(miniOverlay.rectTransform);
             Image miniMarkerImage = CreateImage("PlayerMarker", miniMask.transform, new Color(0.40f, 0.78f, 0.91f, 1f));
             SetRect(miniMarkerImage.rectTransform, Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(18f, 26f), Vector2.one * 0.5f);
+            Image miniObjectiveImage = CreateImage("ObjectiveMarker", miniMask.transform, new Color(0.95f, 0.72f, 0.24f, 1f));
+            SetRect(miniObjectiveImage.rectTransform, Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(18f, 18f), Vector2.one * 0.5f);
             Text north = CreateText("North", miniRoot.transform, theme.Font, "N", 18, TextAnchor.MiddleCenter);
             SetRect(north.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(40f, 24f), new Vector2(0.5f, 1f));
             Text miniFloor = CreateText("Floor", miniRoot.transform, theme.Font, string.Empty, 17, TextAnchor.MiddleRight);
             SetRect(miniFloor.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-12f, 10f), new Vector2(90f, 24f), new Vector2(1f, 0f));
             MiniMapView miniView = miniRoot.AddComponent<MiniMapView>();
-            miniView.Configure(miniGroup, miniImage, miniMarkerImage.rectTransform, miniFloor);
+            miniView.Configure(miniGroup, miniImage, miniOverlay, miniMarkerImage.rectTransform, miniObjectiveImage.rectTransform, miniFloor);
 
             GameObject fullRoot = CreatePanel("AreaMapOverlay", generatedRoot.transform, new Color(0.005f, 0.008f, 0.014f, 0.88f));
             Stretch(fullRoot.GetComponent<RectTransform>());
@@ -591,23 +622,38 @@ namespace DemonLord.Editor
             fullMask.AddComponent<Mask>().showMaskGraphic = false;
             RawImage fullImage = CreateRawImage("MapImage", fullMask.transform);
             Stretch(fullImage.rectTransform);
+            RawImage fullOverlay = CreateRawImage("NavigationOverlay", fullMask.transform);
+            fullOverlay.color = new Color(1f, 1f, 1f, 0.42f);
+            fullOverlay.raycastTarget = false;
+            Stretch(fullOverlay.rectTransform);
             Image playerMarker = CreateImage("PlayerMarker", fullMask.transform, new Color(0.40f, 0.78f, 0.91f, 1f));
             SetRect(playerMarker.rectTransform, Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(24f, 34f), Vector2.one * 0.5f);
+            Image objectiveMarker = CreateImage("ObjectiveMarker", fullMask.transform, new Color(0.95f, 0.72f, 0.24f, 1f));
+            SetRect(objectiveMarker.rectTransform, Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(24f, 24f), Vector2.one * 0.5f);
+            Text objectiveMarkerLabel = CreateText("Label", objectiveMarker.transform, theme.Font, string.Empty, 16, TextAnchor.MiddleLeft);
+            objectiveMarkerLabel.color = new Color(1f, 0.88f, 0.55f, 1f);
+            objectiveMarkerLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
+            SetRect(objectiveMarkerLabel.rectTransform, Vector2.one * 0.5f, Vector2.one * 0.5f, new Vector2(22f, 12f), new Vector2(360f, 30f), new Vector2(0f, 0.5f));
             RectTransform[] portalMarkers = new RectTransform[8];
             for (int index = 0; index < portalMarkers.Length; index++)
             {
                 Image portal = CreateImage("PortalMarker_" + index, fullMask.transform, new Color(0.73f, 0.60f, 0.35f, 1f));
                 SetRect(portal.rectTransform, Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(17f, 17f), Vector2.one * 0.5f);
+                Text portalLabel = CreateText("Label", portal.transform, theme.Font, string.Empty, 15, TextAnchor.MiddleLeft);
+                portalLabel.color = new Color(0.94f, 0.84f, 0.58f, 1f);
+                portalLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
+                portalLabel.verticalOverflow = VerticalWrapMode.Overflow;
+                SetRect(portalLabel.rectTransform, Vector2.one * 0.5f, Vector2.one * 0.5f, new Vector2(16f, 8f), new Vector2(190f, 28f), new Vector2(0f, 0.5f));
                 portalMarkers[index] = portal.rectTransform;
             }
 
-            Text legend = CreateText("Legend", frame.transform, theme.Font, "◆ 출입구     ▲ 현재 위치", 18, TextAnchor.MiddleLeft);
+            Text legend = CreateText("Legend", frame.transform, theme.Font, "◆ 출입구     ▲ 현재 위치     ◇ 현재 업무", 18, TextAnchor.MiddleLeft);
             SetRect(legend.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(54f, 26f), new Vector2(360f, 34f), new Vector2(0f, 0f));
             Text help = CreateText("Help", frame.transform, theme.Font, string.Empty, 18, TextAnchor.MiddleRight);
             help.color = theme.MenuSecondary;
             SetRect(help.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-54f, 26f), new Vector2(620f, 34f), new Vector2(1f, 0f));
             AreaMapView areaView = fullRoot.AddComponent<AreaMapView>();
-            areaView.Configure(fullGroup, fullImage, playerMarker.rectTransform, portalMarkers, area, room, floor, actualFloor, help);
+            areaView.Configure(fullGroup, fullImage, fullOverlay, playerMarker.rectTransform, objectiveMarker.rectTransform, objectiveMarkerLabel, portalMarkers, area, room, floor, actualFloor, help);
             fullRoot.transform.SetAsLastSibling();
             return new MapUiReferences(miniView, areaView);
         }

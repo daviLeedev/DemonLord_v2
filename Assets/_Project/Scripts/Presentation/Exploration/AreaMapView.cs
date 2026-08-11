@@ -10,7 +10,10 @@ namespace DemonLord.Presentation.Exploration
     {
         [SerializeField] private CanvasGroup rootGroup;
         [SerializeField] private RawImage mapImage;
+        [SerializeField] private RawImage navigationOverlayImage;
         [SerializeField] private RectTransform playerMarker;
+        [SerializeField] private RectTransform objectiveMarker;
+        [SerializeField] private Text objectiveMarkerLabel;
         [SerializeField] private RectTransform[] portalMarkers = Array.Empty<RectTransform>();
         [SerializeField] private Text areaLabel;
         [SerializeField] private Text roomLabel;
@@ -23,7 +26,10 @@ namespace DemonLord.Presentation.Exploration
         public void Configure(
             CanvasGroup group,
             RawImage image,
+            RawImage overlayImage,
             RectTransform marker,
+            RectTransform configuredObjectiveMarker,
+            Text configuredObjectiveMarkerLabel,
             RectTransform[] configuredPortalMarkers,
             Text area,
             Text room,
@@ -33,7 +39,10 @@ namespace DemonLord.Presentation.Exploration
         {
             rootGroup = group;
             mapImage = image;
+            navigationOverlayImage = overlayImage;
             playerMarker = marker;
+            objectiveMarker = configuredObjectiveMarker;
+            objectiveMarkerLabel = configuredObjectiveMarkerLabel;
             portalMarkers = configuredPortalMarkers == null ? Array.Empty<RectTransform>() : (RectTransform[])configuredPortalMarkers.Clone();
             areaLabel = area;
             roomLabel = room;
@@ -61,6 +70,7 @@ namespace DemonLord.Presentation.Exploration
             }
 
             SetMarkerVisible(playerMarker, false);
+            SetMarkerVisible(objectiveMarker, false);
             HideUnusedPortalMarkers(0);
         }
 
@@ -72,7 +82,9 @@ namespace DemonLord.Presentation.Exploration
             Transform player,
             PlayerFacing facing,
             float zoom,
-            IReadOnlyList<AreaPortal> portals)
+            IReadOnlyList<AreaPortal> portals,
+            Transform objectiveTarget,
+            string objectiveTitle)
         {
             if (area == null || selectedFloor == null || selectedFloor.BackgroundSprite == null || mapImage == null)
             {
@@ -106,16 +118,40 @@ namespace DemonLord.Presentation.Exploration
                 uvSize.x,
                 uvSize.y);
             mapImage.uvRect = MiniMapView.ToTextureUv(sprite, localUv);
+            RenderNavigationOverlay(selectedFloor.NavigationOverlaySprite, localUv);
 
             if (actual && player != null)
             {
                 SetMarkerVisible(playerMarker, true);
                 playerMarker.anchoredPosition = MapProjection.CalculateMiniMapMarkerPosition(playerNormalized, localUv, mapImage.rectTransform.rect.size);
-                playerMarker.localEulerAngles = new Vector3(0f, 0f, facing == null ? 0f : -facing.CurrentYaw);
+                playerMarker.localEulerAngles = new Vector3(
+                    0f,
+                    0f,
+                    facing == null
+                        ? 0f
+                        : MapProjection.CalculateMarkerRotationDegrees(
+                            facing.CurrentYaw,
+                            selectedFloor,
+                            mapImage.rectTransform.rect.size));
             }
             else
             {
                 SetMarkerVisible(playerMarker, false);
+            }
+
+            if (objectiveMarker != null && actual && objectiveTarget != null
+                && MapProjection.TryWorldToNormalized(objectiveTarget.position, selectedFloor, out Vector2 objectiveNormalized))
+            {
+                SetMarkerVisible(objectiveMarker, true);
+                objectiveMarker.anchoredPosition = MapProjection.CalculateMiniMapMarkerPosition(
+                    objectiveNormalized,
+                    localUv,
+                    mapImage.rectTransform.rect.size);
+                if (objectiveMarkerLabel != null) objectiveMarkerLabel.text = objectiveTitle ?? string.Empty;
+            }
+            else
+            {
+                SetMarkerVisible(objectiveMarker, false);
             }
 
             int visible = 0;
@@ -128,10 +164,26 @@ namespace DemonLord.Presentation.Exploration
                     RectTransform portalMarker = portalMarkers[visible++];
                     SetMarkerVisible(portalMarker, true);
                     portalMarker.anchoredPosition = MapProjection.CalculateMiniMapMarkerPosition(normalized, localUv, mapImage.rectTransform.rect.size);
+                    Text portalLabel = portalMarker.GetComponentInChildren<Text>(true);
+                    if (portalLabel != null) portalLabel.text = portal.DisplayName;
                 }
             }
 
             HideUnusedPortalMarkers(visible);
+        }
+
+        private void RenderNavigationOverlay(Sprite overlaySprite, Rect localUv)
+        {
+            if (navigationOverlayImage == null) return;
+            bool visible = overlaySprite != null && overlaySprite.texture != null;
+            if (navigationOverlayImage.gameObject.activeSelf != visible)
+            {
+                navigationOverlayImage.gameObject.SetActive(visible);
+            }
+
+            if (!visible) return;
+            navigationOverlayImage.texture = overlaySprite.texture;
+            navigationOverlayImage.uvRect = MiniMapView.ToTextureUv(overlaySprite, localUv);
         }
 
         private void HideUnusedPortalMarkers(int start)

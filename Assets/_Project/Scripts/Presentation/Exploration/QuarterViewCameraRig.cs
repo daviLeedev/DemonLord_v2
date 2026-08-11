@@ -216,8 +216,9 @@ namespace DemonLord.Presentation.Exploration
         {
             get
             {
-                QuarterViewCameraProfile profile = selectedZone == null ? null : selectedZone.Profile;
-                return profile ?? defaultProfile ?? new QuarterViewCameraProfile();
+                // Image-map areas are authored against one fixed projection. Camera zones
+                // remain bound for backwards-compatible scene data, but cannot change it.
+                return defaultProfile ?? new QuarterViewCameraProfile();
             }
         }
 
@@ -251,17 +252,16 @@ namespace DemonLord.Presentation.Exploration
                 return;
             }
 
-            int rotationSteps = inputReader.ConsumeCameraRotationSteps();
+            inputReader.ConsumeCameraRotationSteps();
             float zoomDelta = inputReader.ConsumeZoomDelta();
             if (inputGate.IsBlocked(ExplorationInputChannel.Camera) || dialogueOverrides.Count > 0)
             {
                 return;
             }
 
-            if (rotationSteps != 0)
-            {
-                quarterIndex = NormalizeQuarterIndex(quarterIndex + rotationSteps);
-            }
+            // Consume legacy Q/E input so it cannot leak into another context, but keep the
+            // authored quarter fixed. Whole-map floor switching owns Q/E in its own context.
+            quarterIndex = 0;
 
             if (Mathf.Abs(zoomDelta) > Mathf.Epsilon)
             {

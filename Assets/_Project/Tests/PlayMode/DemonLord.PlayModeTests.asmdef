@@ -3,7 +3,8 @@
   "rootNamespace": "DemonLord.Tests.PlayMode",
   "references": [
     "DemonLord.Runtime",
-    "Unity.InputSystem"
+    "Unity.InputSystem",
+    "Unity.InputSystem.TestFramework"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

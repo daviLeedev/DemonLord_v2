@@ -15,9 +15,10 @@ MonoBehaviour:
   floors:
   - floorId: floor-1
     displayName: "1\uCE35"
-    backgroundSprite: {fileID: 21300000, guid: cebe862ccc13c0d42a762bd070c0b319, type: 3}
-    worldOrigin: {x: -15, y: 0, z: -14}
-    worldAxisX: {x: 1, y: 0, z: 0}
-    worldAxisY: {x: 0, y: 0, z: 1}
-    worldSize: {x: 30, y: 34}
+    backgroundSprite: {fileID: 21300000, guid: 24c673499c22451488b69b4eb1d19647, type: 3}
+    navigationOverlaySprite: {fileID: 21300000, guid: efc5b5de9a3fd21448d3208bfd6e9002, type: 3}
+    worldOrigin: {x: -44.805855, y: 0, z: 2.9249382}
+    worldAxisX: {x: 0.70710677, y: 0, z: -0.70710677}
+    worldAxisY: {x: 0.7071069, y: 0, z: 0.70710677}
+    worldSize: {x: 63.965996, y: 62.76409}
     minimapViewportWorldSize: {x: 13, y: 10}

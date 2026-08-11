@@ -69,7 +69,10 @@ namespace DemonLord.Presentation.Exploration
 
             DirectionalAnimationState nextState = ResolveState();
             float cameraYaw = cameraRig != null ? cameraRig.CurrentYawDegrees : 0f;
-            FacingDirection8 nextDirection = DirectionalSpriteMath.ToCameraRelative(playerFacing.CurrentDirection, cameraYaw);
+            FacingDirection8 cameraRelativeDirection = DirectionalSpriteMath.ToCameraRelative(
+                playerFacing.CurrentDirection,
+                cameraYaw);
+            FacingDirection8 nextDirection = cameraRelativeDirection;
             if (nextState != currentState || nextDirection != currentDirection)
             {
                 currentState = nextState;
@@ -131,6 +134,38 @@ namespace DemonLord.Presentation.Exploration
             float relativeYaw = Mathf.Repeat(ExplorationMath.FacingYaw(worldDirection) - cameraYawDegrees, 360f);
             int index = Mathf.FloorToInt((relativeYaw + 22.5f) / 45f) % 8;
             return (FacingDirection8)index;
+        }
+
+        public static FacingDirection8 CollapseToCardinal(
+            FacingDirection8 cameraRelativeDirection,
+            FacingDirection8 lastCardinalDirection)
+        {
+            switch (cameraRelativeDirection)
+            {
+                case FacingDirection8.North:
+                case FacingDirection8.East:
+                case FacingDirection8.South:
+                case FacingDirection8.West:
+                    return cameraRelativeDirection;
+                case FacingDirection8.NorthEast:
+                    return lastCardinalDirection == FacingDirection8.East
+                        ? FacingDirection8.East
+                        : FacingDirection8.North;
+                case FacingDirection8.SouthEast:
+                    return lastCardinalDirection == FacingDirection8.East
+                        ? FacingDirection8.East
+                        : FacingDirection8.South;
+                case FacingDirection8.SouthWest:
+                    return lastCardinalDirection == FacingDirection8.West
+                        ? FacingDirection8.West
+                        : FacingDirection8.South;
+                case FacingDirection8.NorthWest:
+                    return lastCardinalDirection == FacingDirection8.West
+                        ? FacingDirection8.West
+                        : FacingDirection8.North;
+                default:
+                    return FacingDirection8.South;
+            }
         }
     }
 

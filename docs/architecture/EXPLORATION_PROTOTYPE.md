@@ -33,12 +33,12 @@
 | `ExplorationInputGate` | 이동·대시·상호작용·카메라 채널별 소유권 토큰 잠금 |
 | `PlayerMotor` | CharacterController 걷기·달리기·중력·거리 예산형 대시·충돌 |
 | `PlayerFacing` | 마지막 유효 이동을 45도 단위 8방향으로 유지하고 별도 visual root에 표현 |
-| `QuarterViewCameraRig` | 정사영 추적, 정수 quarter index 회전, 줌, zone 및 대화 override |
-| `CameraZone` | 플레이어 Collider만 감지하는 BoxCollider trigger와 카메라 profile 수명주기 |
+| `QuarterViewCameraRig` | 이미지 맵과 같은 정사영 고정 각도 추적 및 제한된 줌 |
+| `CameraZone` | 이전 씬 데이터 호환용 trigger. 이미지 맵 지역에서는 투영 profile을 바꾸지 않음 |
 | `InteractionSensor` | 고정 버퍼 후보 수집, 반경·cone·LOS 검사, 현재 대상 하나 선택 |
 | `PrototypeInteractable` | 표시명, 행동명, focus/marker/대화 anchor와 임시 대사 제공 |
 | `InteractionPromptView` | 선택 marker와 `F 대화`/`F 조사` UGUI 표시 |
-| `DialogueFocusController` | 대화 잠금, 상호 facing, 대화 카메라와 UI, 모든 종료 경로 복원 |
+| `DialogueFocusController` | 대화 잠금, 상호 facing, 대화 UI, 모든 종료 경로 복원. 카메라는 변경하지 않음 |
 
 Domain/Application에는 새 UnityEngine 의존성을 추가하지 않았다. 물리·입력·카메라 결합 코드는 `Presentation/Exploration`에 한정한다.
 
@@ -49,7 +49,7 @@ Domain/Application에는 새 UnityEngine 의존성을 추가하지 않았다. �
 | WASD | 현재 카메라의 XZ forward/right 기준 자유 이동 |
 | Left Shift hold | 달리기 |
 | Space press | 현재 이동 방향, 입력이 없으면 마지막 facing 방향으로 대시 |
-| Q / E press | 정확한 90도 단위 카메라 좌·우 회전 |
+| Q / E press | 탐험 카메라에는 영향 없음. 전체 지도 다층 전환 컨텍스트에서만 예약 |
 | Mouse Wheel | 정사영 확대·축소 |
 | M press / Gamepad Select | 전체 지도 열기·닫기 |
 | Q / E / shoulder | 전체 지도에서 floor 전환 (2층 이상 지역만) |
@@ -57,19 +57,19 @@ Domain/Application에는 새 UnityEngine 의존성을 추가하지 않았다. �
 | Enter | 대화 다음 줄 |
 | Escape | 대화 종료 |
 
-Inspector 기본값은 걷기 `3.0m/s`, 달리기 `5.5m/s`, 대시 `3.0m / 0.18s / cooldown 0.65s`, slope limit `45°`, step offset `0.3m`다. 카메라는 yaw `45°`, pitch 약 `35°`, 회전 전환 약 `0.25s`, orthographic size `8`, 제한 `6~12`, 휠 줌 감도 `0.03`을 사용한다. 상호작용 반경은 `2.2m`, 전체 전방 cone은 약 `100°`다.
+Inspector 기본값은 걷기 `3.0m/s`, 달리기 `5.5m/s`, 대시 `3.0m / 0.18s / cooldown 0.65s`, slope limit `45°`, step offset `0.3m`다. 카메라는 이미지 맵 캘리브레이션과 같은 고정 yaw `45°`, pitch `35°`, orthographic size `8`, 제한 `6~12`, 휠 줌 감도 `0.03`을 사용한다. 상호작용 반경은 `2.2m`, 전체 전방 cone은 약 `100°`다.
 
 ## 결정적 선택 정책
 
 상호작용 후보는 활성/가능 여부, 반경, 마지막 facing 기준 전방 cone, LOS 순으로 거른다. 남은 후보는 정렬된 alignment 내림차순, 거리 제곱 오름차순, stable ID ordinal 오름차순으로 하나만 선택한다.
 
-CameraZone이 겹치면 다음 순서를 적용한다.
+레거시 CameraZone이 겹쳐도 이미지 맵 지역의 yaw/pitch/orthographic profile은 바뀌지 않는다. 이미지 원화와 월드 캐릭터의 투영 일치를 위해 기본 profile 하나가 투영의 진실의 원천이다. CameraZone 우선순위 데이터는 이전 씬과 테스트 호환을 위해 보존하되 탐험 표현에는 적용하지 않는다.
 
 1. 높은 `priority`
 2. 같은 priority면 가장 최근에 진입한 zone
 3. 진입 순서도 같으면 `stableId` ordinal 오름차순
 
-zone 안의 Q/E quarter index와 zoom offset은 허용된다. 퇴장하면 이전 기본 profile로 복귀한다. 대화 override는 현재 카메라 상태 위에 임시로 적용하며, handle 해제 후 zone/기본 profile과 quarter/zoom 상태로 돌아간다.
+Q/E quarter 회전은 사용하지 않는다. zoom offset만 기본 profile의 `6~12` 제한 안에서 유지한다. 대화 시작과 종료는 카메라 위치·회전·줌을 바꾸지 않으며 UI와 입력 잠금만 전환한다.
 
 ## 씬과 authoring
 
@@ -130,11 +130,11 @@ PlayMode 테스트 러너는 수동 플레이를 위한 Boot 시작 씬 override
 
 ### 1회성 입력 소비 정책
 
-`Confirm`, `Cancel`, `Interact`, `Dash`는 `ExplorationInputReader`가 한 번만 소비하는 edge 입력이다. 이동·달리기·줌은 held/value 입력으로 유지한다. 대화는 시작 직전에 이미 남아 있던 `Confirm`/`Interact`/`Cancel`을 비워 시작 F 또는 이전 Escape가 첫 줄 진행·즉시 종료로 번지지 않게 한다. 대화 중의 새 F/Enter는 한 줄만 진행하고, 새 Escape만 현재 대화를 종료한다. 대화 UI, CanvasGroup, NPC 또는 컨트롤러가 비활성화·파괴되면 종료 경로는 같은 disposable 입력 잠금·카메라 override handle을 정확히 한 번 해제한다.
+`Confirm`, `Cancel`, `Interact`, `Dash`는 `ExplorationInputReader`가 한 번만 소비하는 edge 입력이다. 이동·달리기·줌은 held/value 입력으로 유지한다. 대화는 시작 직전에 이미 남아 있던 `Confirm`/`Interact`/`Cancel`을 비워 시작 F 또는 이전 Escape가 첫 줄 진행·즉시 종료로 번지지 않게 한다. 대화 중의 새 F/Enter는 한 줄만 진행하고, 새 Escape만 현재 대화를 종료한다. 대화 UI, CanvasGroup, NPC 또는 컨트롤러가 비활성화·파괴되면 종료 경로는 같은 disposable 입력 잠금을 정확히 한 번 해제한다. 카메라 override handle은 만들지 않는다.
 
 ### 아트 교체 가이드
 
-- 세무관의 임시 32방향 상태 이미지는 `Assets/_Project/Art/Characters/TaxOfficer/Placeholder/`에 있다. 같은 파일명·방향 순서를 유지하거나 `TaxOfficerPlaceholderDirectionalAnimationSet.asset`의 Sprite 참조만 교체하면 코드 변경 없이 새 원화를 연결할 수 있다.
+- 세무관 월드 표현은 `Assets/_Project/Art/Characters/TaxOfficer/SD/WhiteUniform/`의 흰 제복 SD 원화를 사용한다. 기본 4방향과 사선 4방향은 각각 4×4 걷기 시트이며, 런타임은 카메라 상대 8방향을 축약하지 않고 직접 선택한다. 시트의 열 방향·행 보행 단계와 313×313 셀 규격을 유지하면 같은 animation set으로 교체할 수 있다.
 - 세무관과 연구원 기본 초상화는 각각 `Assets/_Project/Art/Characters/TaxOfficer/Portraits/`와 `Assets/_Project/Art/Characters/WorldlineResearcher/Portraits/`에 있다. 표정 변형을 추가할 때는 `DialogueSequence`의 participant/line 데이터에 참조를 확장하고, 화자 이름 문자열로 이미지를 추론하지 않는다.
 - 연구실 블록아웃 재질과 세계조정국 표식은 `Assets/_Project/Art/Prototype/WorldAdjustmentLab/` 아래에 있다. `TextureKit/`에는 슬레이트·황동/현무암·청색/버건디 대리석 바닥, 석재·황동/기록보관실 벽돌/격리실 금속 벽, 일반/기록실 양문/격리실 보안문, 세 종류의 계단 마감 원본을 둔다. 빌더가 이 원본에서 반복·클램프 임포트 설정과 재질 참조를 구성하므로 파일명은 유지한다. 최종 모델·타일·데칼로 바꿀 때에도 `CharacterController`, 벽/문/가구의 collider, 카메라 zone과 빌더의 전용 루트 계약은 유지한다.
 - 대화 패널의 글꼴·색·크기는 `Assets/_Project/ScriptableObjects/Exploration/WorldAdjustmentLabDialogueTheme.asset`에서 바꾼다. 한국어 글리프가 들어 있는 라이선스 확인 폰트를 연결한 뒤 빌더 검증을 다시 실행한다.

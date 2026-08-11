@@ -12,13 +12,15 @@ namespace DemonLord.Domain
         public const string ResearcherBriefed = "researcher_briefed";
         public const string TaxLedgerReviewed = "tax_ledger_reviewed";
         public const string ArchiveCatalogued = "archive_catalogued";
+        public const string CombatLiaisonBriefed = "combat_liaison_briefed";
 
         public static bool IsKnown(string checkpointId)
         {
             return string.Equals(checkpointId, Start, StringComparison.Ordinal)
                 || string.Equals(checkpointId, ResearcherBriefed, StringComparison.Ordinal)
                 || string.Equals(checkpointId, TaxLedgerReviewed, StringComparison.Ordinal)
-                || string.Equals(checkpointId, ArchiveCatalogued, StringComparison.Ordinal);
+                || string.Equals(checkpointId, ArchiveCatalogued, StringComparison.Ordinal)
+                || string.Equals(checkpointId, CombatLiaisonBriefed, StringComparison.Ordinal);
         }
     }
 }

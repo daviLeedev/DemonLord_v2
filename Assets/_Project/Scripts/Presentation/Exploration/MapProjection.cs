@@ -65,6 +65,33 @@ namespace DemonLord.Presentation.Exploration
             return NormalizedToRect(within, rectSize, true);
         }
 
+        public static float CalculateMarkerRotationDegrees(
+            float worldFacingYaw,
+            MapFloorDefinition floor,
+            Vector2 mapRectSize)
+        {
+            if (floor == null || !floor.TryValidate(out _))
+            {
+                return -worldFacingYaw;
+            }
+
+            Vector3 worldDirection = Quaternion.Euler(0f, worldFacingYaw, 0f) * Vector3.forward;
+            float rectWidth = Mathf.Max(0.0001f, Mathf.Abs(mapRectSize.x));
+            float rectHeight = Mathf.Max(0.0001f, Mathf.Abs(mapRectSize.y));
+            float mapX = Vector3.Dot(worldDirection, floor.WorldAxisX.normalized)
+                / floor.WorldSize.x
+                * rectWidth;
+            float mapY = Vector3.Dot(worldDirection, floor.WorldAxisY.normalized)
+                / floor.WorldSize.y
+                * rectHeight;
+            if (Mathf.Abs(mapX) <= 0.0001f && Mathf.Abs(mapY) <= 0.0001f)
+            {
+                return 0f;
+            }
+
+            return -Mathf.Atan2(mapX, mapY) * Mathf.Rad2Deg;
+        }
+
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);

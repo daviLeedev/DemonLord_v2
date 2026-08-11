@@ -30,6 +30,12 @@ namespace DemonLord.Presentation.Exploration
         public void Configure(Font configuredFont)
         {
             font = configuredFont;
+            bodyFontSize = 32;
+            nameFontSize = 28;
+            bodyColor = new Color(0.94f, 0.95f, 0.98f, 1f);
+            playerAccent = new Color(0.40f, 0.78f, 0.91f, 1f);
+            partnerAccent = new Color(0.78f, 0.66f, 0.96f, 1f);
+            inactivePortraitAlpha = 0.62f;
         }
     }
 }

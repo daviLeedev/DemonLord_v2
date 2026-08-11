@@ -79,6 +79,7 @@ namespace DemonLord.Presentation.Exploration
         [SerializeField] private string floorId = "floor-1";
         [SerializeField] private string displayName = "1층";
         [SerializeField] private Sprite backgroundSprite;
+        [SerializeField] private Sprite navigationOverlaySprite;
         [SerializeField] private Vector3 worldOrigin;
         [SerializeField] private Vector3 worldAxisX = Vector3.right;
         [SerializeField] private Vector3 worldAxisY = Vector3.forward;
@@ -88,6 +89,7 @@ namespace DemonLord.Presentation.Exploration
         public string FloorId => floorId ?? string.Empty;
         public string DisplayName => displayName ?? string.Empty;
         public Sprite BackgroundSprite => backgroundSprite;
+        public Sprite NavigationOverlaySprite => navigationOverlaySprite;
         public Vector3 WorldOrigin => worldOrigin;
         public Vector3 WorldAxisX => worldAxisX;
         public Vector3 WorldAxisY => worldAxisY;
@@ -102,11 +104,13 @@ namespace DemonLord.Presentation.Exploration
             Vector3 configuredWorldAxisX,
             Vector3 configuredWorldAxisY,
             Vector2 configuredWorldSize,
-            Vector2 configuredMinimapViewportWorldSize)
+            Vector2 configuredMinimapViewportWorldSize,
+            Sprite configuredNavigationOverlaySprite = null)
         {
             floorId = configuredFloorId ?? string.Empty;
             displayName = configuredDisplayName ?? string.Empty;
             backgroundSprite = configuredBackgroundSprite;
+            navigationOverlaySprite = configuredNavigationOverlaySprite;
             worldOrigin = configuredWorldOrigin;
             worldAxisX = configuredWorldAxisX;
             worldAxisY = configuredWorldAxisY;

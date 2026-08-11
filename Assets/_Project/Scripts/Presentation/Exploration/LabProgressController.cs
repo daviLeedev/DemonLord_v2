@@ -18,6 +18,7 @@ namespace DemonLord.Presentation.Exploration
         [SerializeField] private PrototypeInteractable researcher;
         [SerializeField] private PrototypeInteractable taxLedger;
         [SerializeField] private PrototypeInteractable archiveCatalog;
+        [SerializeField] private PrototypeInteractable combatLiaison;
         [SerializeField] private LabDoorController archiveAnnexDoor;
 
         private IPlayerSession playerSession;
@@ -26,12 +27,19 @@ namespace DemonLord.Presentation.Exploration
         private bool initialized;
         private ExplorationLocationState locationState;
 
+        public event Action<LabObjectiveState> ObjectiveChanged;
+
+        public LabObjectiveState CurrentObjective => GetObjective(currentStage);
+
+        public bool IsCombatHandoffComplete => currentStage >= 4;
+
         public void Configure(
             DialogueFocusController configuredDialogueController,
             NotificationView configuredNotificationView,
             PrototypeInteractable configuredResearcher,
             PrototypeInteractable configuredTaxLedger,
             PrototypeInteractable configuredArchiveCatalog,
+            PrototypeInteractable configuredCombatLiaison,
             LabDoorController configuredArchiveAnnexDoor)
         {
             dialogueController = configuredDialogueController;
@@ -39,6 +47,7 @@ namespace DemonLord.Presentation.Exploration
             researcher = configuredResearcher;
             taxLedger = configuredTaxLedger;
             archiveCatalog = configuredArchiveCatalog;
+            combatLiaison = configuredCombatLiaison;
             archiveAnnexDoor = configuredArchiveAnnexDoor;
         }
 
@@ -78,6 +87,8 @@ namespace DemonLord.Presentation.Exploration
             }
 
             initialized = true;
+            ApplyObjectiveMarkers();
+            ObjectiveChanged?.Invoke(CurrentObjective);
             return true;
         }
 
@@ -94,6 +105,7 @@ namespace DemonLord.Presentation.Exploration
                 researcher = null;
                 taxLedger = null;
                 archiveCatalog = null;
+                combatLiaison = null;
                 archiveAnnexDoor = null;
                 return;
             }
@@ -101,11 +113,15 @@ namespace DemonLord.Presentation.Exploration
             areaRoot.TryGetInteractable("worldline-researcher", out researcher);
             areaRoot.TryGetInteractable("tax-ledger", out taxLedger);
             areaRoot.TryGetInteractable("archive-catalog", out archiveCatalog);
+            areaRoot.TryGetInteractable("combat-liaison-officer", out combatLiaison);
             areaRoot.TryGetDoor("door_archiveannex", out archiveAnnexDoor);
             if (currentStage >= 3)
             {
                 archiveAnnexDoor?.Unlock();
             }
+
+            ApplyObjectiveMarkers();
+            ObjectiveChanged?.Invoke(CurrentObjective);
         }
 
         private void OnDisable()
@@ -134,7 +150,13 @@ namespace DemonLord.Presentation.Exploration
 
             if (interactable == archiveCatalog)
             {
-                TryAdvance(3, LabCheckpointId.ArchiveCatalogued, "분류 장부를 기록했습니다. 현재 구역의 조사가 완료되었습니다.");
+                TryAdvance(3, LabCheckpointId.ArchiveCatalogued, "분류 장부를 기록했습니다. 전투 대응 집행관에게 조사 결과를 인계하십시오.");
+                return;
+            }
+
+            if (interactable == combatLiaison)
+            {
+                TryAdvance(4, LabCheckpointId.CombatLiaisonBriefed, "현장 인계를 완료했습니다. 전투 시퀀스 연결 준비가 끝났습니다.");
             }
         }
 
@@ -168,6 +190,41 @@ namespace DemonLord.Presentation.Exploration
             }
 
             notificationView?.Show(successMessage);
+            ApplyObjectiveMarkers();
+            ObjectiveChanged?.Invoke(CurrentObjective);
+        }
+
+        private void ApplyObjectiveMarkers()
+        {
+            string targetId = CurrentObjective.TargetStableId;
+            SetObjectiveMarker(researcher, targetId);
+            SetObjectiveMarker(taxLedger, targetId);
+            SetObjectiveMarker(archiveCatalog, targetId);
+            SetObjectiveMarker(combatLiaison, targetId);
+        }
+
+        private static void SetObjectiveMarker(PrototypeInteractable interactable, string targetId)
+        {
+            if (interactable == null) return;
+            WorldInteractionIndicator indicator = interactable.GetComponentInChildren<WorldInteractionIndicator>(true);
+            indicator?.SetObjectiveTarget(string.Equals(interactable.StableId, targetId, StringComparison.Ordinal));
+        }
+
+        private static LabObjectiveState GetObjective(int stage)
+        {
+            switch (stage)
+            {
+                case 0:
+                    return new LabObjectiveState(0, "세계선 분석 연구원에게 보고받기", "worldline-researcher", false);
+                case 1:
+                    return new LabObjectiveState(1, "세무 기록부 조사", "tax-ledger", false);
+                case 2:
+                    return new LabObjectiveState(2, "기록보관실 분류 장부 조사", "archive-catalog", false);
+                case 3:
+                    return new LabObjectiveState(3, "전투 대응 집행관에게 조사 결과 인계", "combat-liaison-officer", false);
+                default:
+                    return new LabObjectiveState(4, "현재 업무 완료", string.Empty, true);
+            }
         }
 
         private static int GetStage(string checkpointId)
@@ -187,7 +244,12 @@ namespace DemonLord.Presentation.Exploration
                 return 2;
             }
 
-            return string.Equals(checkpointId, LabCheckpointId.ArchiveCatalogued, StringComparison.Ordinal) ? 3 : -1;
+            if (string.Equals(checkpointId, LabCheckpointId.ArchiveCatalogued, StringComparison.Ordinal))
+            {
+                return 3;
+            }
+
+            return string.Equals(checkpointId, LabCheckpointId.CombatLiaisonBriefed, StringComparison.Ordinal) ? 4 : -1;
         }
     }
 }

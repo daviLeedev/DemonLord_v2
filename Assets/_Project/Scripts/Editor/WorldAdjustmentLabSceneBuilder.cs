@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using DemonLord.Presentation;
 using DemonLord.Presentation.Exploration;
@@ -23,11 +24,18 @@ namespace DemonLord.Editor
         private const string PrefabFolder = "Assets/_Project/Prefabs/Exploration/WorldAdjustmentLab";
         private const string ScriptableObjectFolder = "Assets/_Project/ScriptableObjects/Exploration";
         private const string MaterialFolder = "Assets/_Project/Art/Prototype/WorldAdjustmentLab/Materials";
-        private const string TaxOfficerSpriteFolder = "Assets/_Project/Art/Characters/TaxOfficer/Placeholder";
+        private const string TaxOfficerCardinalWalkSheetPath = "Assets/_Project/Art/Characters/TaxOfficer/SD/WhiteUniform/tax_officer_white_sd_cardinal_walk_grid_v2.png";
+        private const string TaxOfficerDiagonalWalkSheetPath = "Assets/_Project/Art/Characters/TaxOfficer/SD/WhiteUniform/tax_officer_white_sd_diagonal_walk_grid_v2.png";
+        private const string TaxOfficerSpritePrefix = "tax_officer_white_sd";
+        private const int TaxOfficerSheetColumns = 4;
+        private const int TaxOfficerSheetRows = 4;
         private const string DialoguePortraitFolder = "Assets/_Project/Art/Dialogue/Portraits";
         private const string DialogueArtFolder = "Assets/_Project/Art/UI/Dialogue";
-        private const string TaxOfficerPortraitPath = DialoguePortraitFolder + "/tax_officer_dialogue_profile_v2.png";
-        private const string ResearcherPortraitPath = DialoguePortraitFolder + "/worldline_researcher_dialogue_profile_v2.png";
+        private const string TaxOfficerPortraitPath = DialoguePortraitFolder + "/tax_officer_dialogue_profile_white_v3.png";
+        private const string ResearcherPortraitPath = DialoguePortraitFolder + "/worldline_researcher_dialogue_profile_cute_v3.png";
+        private const string CombatLiaisonPortraitPath = DialoguePortraitFolder + "/combat_liaison_dialogue_profile_cute_v1.png";
+        private const string DialoguePanelPath = DialogueArtFolder + "/dialogue_panel_cute_v3.png";
+        private const string DialogueNameplatePath = DialogueArtFolder + "/dialogue_nameplate_cute_v3.png";
         private const string SealPath = "Assets/_Project/Art/Prototype/WorldAdjustmentLab/bureau_seal_decal.png";
         private const string TextureKitFolder = "Assets/_Project/Art/Prototype/WorldAdjustmentLab/TextureKit";
         private const string SaveCompleteSfxPath = "Assets/_Project/Resources/Audio/Ui/ui_save_complete_01.wav";
@@ -124,10 +132,9 @@ namespace DemonLord.Editor
             DirectionalAnimationSet animationSet = CreateDirectionalAnimationSet();
             DialogueTheme dialogueTheme = CreateDialogueTheme();
             DialogueSequence researcherSequence = CreateResearcherDialogue(dialogueVisuals.TaxOfficerPortrait, dialogueVisuals.ResearcherPortrait);
-            DialogueSequence combatLiaisonSequence = CreateCombatLiaisonDialogue(dialogueVisuals.TaxOfficerPortrait);
+            DialogueSequence combatLiaisonSequence = CreateCombatLiaisonDialogue(dialogueVisuals.TaxOfficerPortrait, dialogueVisuals.CombatLiaisonPortrait);
             LabMaterials materials = CreateMaterials();
-            TaxOfficerModelPackage taxOfficerModel = TaxOfficerModelAssetBuilder.Prepare();
-            LabPrefabs prefabs = CreatePrefabs(materials, taxOfficerModel);
+            LabPrefabs prefabs = CreatePrefabs(materials);
             return new LabAssets(animationSet, dialogueTheme, researcherSequence, combatLiaisonSequence, dialogueVisuals, bureauSeal, materials, prefabs);
         }
 
@@ -136,8 +143,9 @@ namespace DemonLord.Editor
             return new DialogueVisualAssets(
                 LoadSingleSprite(TaxOfficerPortraitPath),
                 LoadSingleSprite(ResearcherPortraitPath),
-                LoadSingleSprite(DialogueArtFolder + "/dialogue_panel_wide_v2.png"),
-                LoadSingleSprite(DialogueArtFolder + "/dialogue_nameplate_v2.png"),
+                LoadSingleSprite(CombatLiaisonPortraitPath),
+                LoadSlicedSprite(DialoguePanelPath, new Vector4(170f, 120f, 170f, 120f)),
+                LoadSlicedSprite(DialogueNameplatePath, new Vector4(210f, 170f, 210f, 170f)),
                 LoadSingleSprite(DialogueArtFolder + "/dialogue_continue_prompt_v2.png"),
                 LoadSingleSprite(DialogueArtFolder + "/dialogue_choice_button_normal_v2.png"),
                 LoadSingleSprite(DialogueArtFolder + "/dialogue_choice_button_selected_v2.png"),
@@ -147,7 +155,13 @@ namespace DemonLord.Editor
 
         private static DirectionalAnimationSet CreateDirectionalAnimationSet()
         {
-            const string assetPath = ScriptableObjectFolder + "/TaxOfficerPlaceholderDirectionalAnimationSet.asset";
+            ConfigureTaxOfficerSdSheet(
+                TaxOfficerCardinalWalkSheetPath,
+                new[] { "down", "right", "up", "left" });
+            ConfigureTaxOfficerSdSheet(
+                TaxOfficerDiagonalWalkSheetPath,
+                new[] { "down_right", "up_right", "up_left", "down_left" });
+            const string assetPath = ScriptableObjectFolder + "/TaxOfficerSdDirectionalAnimationSet.asset";
             DirectionalAnimationSet set = AssetDatabase.LoadAssetAtPath<DirectionalAnimationSet>(assetPath);
             if (set == null)
             {
@@ -155,23 +169,174 @@ namespace DemonLord.Editor
                 AssetDatabase.CreateAsset(set, assetPath);
             }
 
-            string[] states = { "idle", "walk", "run", "dash" };
-            string[] directions = { "n", "ne", "e", "se", "s", "sw", "w", "nw" };
-            Sprite[][][] stateFrames = new Sprite[states.Length][][];
-            for (int stateIndex = 0; stateIndex < states.Length; stateIndex++)
+            Sprite[][] walkFrames =
             {
-                stateFrames[stateIndex] = new Sprite[directions.Length][];
-                for (int directionIndex = 0; directionIndex < directions.Length; directionIndex++)
+                LoadWalkFrames(TaxOfficerCardinalWalkSheetPath, "up"),
+                // Direction labels describe the final on-screen facing. Billboarding must not mirror them.
+                LoadWalkFrames(TaxOfficerDiagonalWalkSheetPath, "up_right"),
+                LoadWalkFrames(TaxOfficerCardinalWalkSheetPath, "right"),
+                LoadWalkFrames(TaxOfficerDiagonalWalkSheetPath, "down_right"),
+                LoadWalkFrames(TaxOfficerCardinalWalkSheetPath, "down"),
+                LoadWalkFrames(TaxOfficerDiagonalWalkSheetPath, "down_left"),
+                LoadWalkFrames(TaxOfficerCardinalWalkSheetPath, "left"),
+                LoadWalkFrames(TaxOfficerDiagonalWalkSheetPath, "up_left"),
+            };
+            Sprite[][] idleFrames = walkFrames
+                .Select(frames => new[] { frames[1] })
+                .ToArray();
+            Sprite[][] dashFrames = walkFrames
+                .Select(frames => new[] { frames[0], frames[2] })
+                .ToArray();
+
+            set.Configure(idleFrames, walkFrames, walkFrames, dashFrames);
+            EditorUtility.SetDirty(set);
+            return set;
+        }
+
+        private static void ConfigureTaxOfficerSdSheet(string assetPath, string[] columnDirections)
+        {
+            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (importer == null)
+            {
+                throw new InvalidOperationException("Tax officer SD sprite sheet is missing: " + assetPath);
+            }
+
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+            if (texture == null)
+            {
+                importer.SaveAndReimport();
+                texture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+            }
+
+            if (texture == null
+                || texture.width % TaxOfficerSheetColumns != 0
+                || texture.height % TaxOfficerSheetRows != 0
+                || columnDirections == null
+                || columnDirections.Length != TaxOfficerSheetColumns)
+            {
+                throw new InvalidOperationException("Tax officer SD sheet must be an exact 4x4 grid: " + assetPath);
+            }
+
+            int cellWidth = texture.width / TaxOfficerSheetColumns;
+            int cellHeight = texture.height / TaxOfficerSheetRows;
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Multiple;
+            importer.spritePixelsPerUnit = 320f;
+            importer.mipmapEnabled = false;
+            importer.alphaSource = TextureImporterAlphaSource.FromInput;
+            importer.alphaIsTransparency = true;
+            importer.sRGBTexture = true;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.maxTextureSize = 2048;
+            importer.textureCompression = TextureImporterCompression.CompressedHQ;
+            Texture2D sourceTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            if (!sourceTexture.LoadImage(File.ReadAllBytes(Path.GetFullPath(assetPath)), false))
+            {
+                UnityEngine.Object.DestroyImmediate(sourceTexture);
+                throw new InvalidOperationException("Tax officer SD sheet pixels could not be read: " + assetPath);
+            }
+
+            List<SpriteMetaData> sprites = new List<SpriteMetaData>(TaxOfficerSheetColumns * TaxOfficerSheetRows);
+            try
+            {
+                Color32[] pixels = sourceTexture.GetPixels32();
+                for (int row = 0; row < TaxOfficerSheetRows; row++)
                 {
-                    string path = TaxOfficerSpriteFolder + "/tax_officer_" + states[stateIndex] + "_" + directions[directionIndex] + ".png";
-                    Sprite sprite = LoadSingleSprite(path);
-                    stateFrames[stateIndex][directionIndex] = new[] { sprite };
+                    int y = texture.height - ((row + 1) * cellHeight);
+                    for (int column = 0; column < TaxOfficerSheetColumns; column++)
+                    {
+                        string spriteName = TaxOfficerSpritePrefix
+                            + "_" + columnDirections[column]
+                            + "_walk_" + row;
+                        Vector2 pivot = CalculateFootAlignedPivot(
+                            pixels,
+                            sourceTexture.width,
+                            column * cellWidth,
+                            y,
+                            cellWidth,
+                            cellHeight);
+                        sprites.Add(CreateSpriteMetaData(
+                            spriteName,
+                            column * cellWidth,
+                            y,
+                            cellWidth,
+                            cellHeight,
+                            pivot));
+                    }
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(sourceTexture);
+            }
+
+            importer.spritesheet = sprites.ToArray();
+            importer.SaveAndReimport();
+        }
+
+        private static Sprite[] LoadWalkFrames(string assetPath, string direction)
+        {
+            Sprite[] frames = new Sprite[TaxOfficerSheetRows];
+            for (int frame = 0; frame < frames.Length; frame++)
+            {
+                frames[frame] = LoadNamedSprite(
+                    assetPath,
+                    TaxOfficerSpritePrefix + "_" + direction + "_walk_" + frame);
+            }
+
+            return frames;
+        }
+
+        private static Vector2 CalculateFootAlignedPivot(
+            Color32[] pixels,
+            int textureWidth,
+            int rectX,
+            int rectY,
+            int width,
+            int height)
+        {
+            const byte alphaThreshold = 16;
+            const float baselinePivot = 0.055f;
+            int lowestOpaquePixel = height;
+            for (int localY = 0; localY < height && lowestOpaquePixel == height; localY++)
+            {
+                int pixelRow = (rectY + localY) * textureWidth;
+                for (int localX = 0; localX < width; localX++)
+                {
+                    if (pixels[pixelRow + rectX + localX].a <= alphaThreshold) continue;
+                    lowestOpaquePixel = localY;
+                    break;
                 }
             }
 
-            set.Configure(stateFrames[0], stateFrames[1], stateFrames[2], stateFrames[3]);
-            EditorUtility.SetDirty(set);
-            return set;
+            int transparentFootMargin = lowestOpaquePixel < height ? lowestOpaquePixel : 0;
+            float pivotY = baselinePivot + (float)transparentFootMargin / height;
+            return new Vector2(0.5f, Mathf.Clamp01(pivotY));
+        }
+
+        private static SpriteMetaData CreateSpriteMetaData(string name, int x, int y, int width, int height, Vector2 pivot)
+        {
+            return new SpriteMetaData
+            {
+                name = name,
+                rect = new Rect(x, y, width, height),
+                alignment = (int)SpriteAlignment.Custom,
+                pivot = pivot,
+            };
+        }
+
+        private static Sprite LoadNamedSprite(string assetPath, string spriteName)
+        {
+            Sprite sprite = AssetDatabase.LoadAllAssetsAtPath(assetPath)
+                .OfType<Sprite>()
+                .FirstOrDefault(candidate => string.Equals(candidate.name, spriteName, StringComparison.Ordinal));
+            if (sprite == null)
+            {
+                throw new InvalidOperationException("Sprite import failed: " + assetPath + "#" + spriteName);
+            }
+
+            return sprite;
         }
 
         private static DialogueTheme CreateDialogueTheme()
@@ -215,7 +380,7 @@ namespace DemonLord.Editor
             return sequence;
         }
 
-        private static DialogueSequence CreateCombatLiaisonDialogue(Sprite taxOfficerPortrait)
+        private static DialogueSequence CreateCombatLiaisonDialogue(Sprite taxOfficerPortrait, Sprite combatLiaisonPortrait)
         {
             const string assetPath = ScriptableObjectFolder + "/CombatLiaisonBriefing.asset";
             DialogueSequence sequence = AssetDatabase.LoadAssetAtPath<DialogueSequence>(assetPath);
@@ -228,8 +393,7 @@ namespace DemonLord.Editor
             DialogueParticipant player = new DialogueParticipant();
             player.Configure("tax-officer", "세무관", taxOfficerPortrait);
             DialogueParticipant partner = new DialogueParticipant();
-            // The combat liaison portrait is intentionally left empty until its final art is supplied.
-            partner.Configure("combat-liaison-officer", "전투 대응 집행관", null);
+            partner.Configure("combat-liaison-officer", "전투 대응 집행관", combatLiaisonPortrait);
             DialogueLine[] lines =
             {
                 CreateDialogueLine(DialogueSpeakerSide.Partner, "세무관님, 조정 대상의 적대 반응이 확인됐습니다."),
@@ -272,16 +436,16 @@ namespace DemonLord.Editor
                 CreateMaterial("Selection", new Color(0.92f, 0.72f, 0.22f), true));
         }
 
-        private static LabPrefabs CreatePrefabs(LabMaterials materials, TaxOfficerModelPackage taxOfficerModel)
+        private static LabPrefabs CreatePrefabs(LabMaterials materials)
         {
-            GameObject playerTemplate = CreatePlayerTemplate(taxOfficerModel);
+            GameObject playerTemplate = CreatePlayerTemplate();
             GameObject player = SavePrefab(playerTemplate, PrefabFolder + "/WorldAdjustmentLabPlayer.prefab");
             GameObject npcTemplate = CreateNpcTemplate(materials);
             GameObject npc = SavePrefab(npcTemplate, PrefabFolder + "/WorldAdjustmentLabNpc.prefab");
             return new LabPrefabs(player, npc);
         }
 
-        private static GameObject CreatePlayerTemplate(TaxOfficerModelPackage taxOfficerModel)
+        private static GameObject CreatePlayerTemplate()
         {
             GameObject root = new GameObject("WorldAdjustmentLabPlayer");
             CharacterController controller = root.AddComponent<CharacterController>();
@@ -295,36 +459,13 @@ namespace DemonLord.Editor
             root.AddComponent<PlayerMotor>();
             root.AddComponent<InteractionSensor>();
 
-            Transform visual = CreateObject("ModelVisual", root.transform).transform;
-            PlayerFacing facing = root.GetComponent<PlayerFacing>();
-            facing.SetVisualRoot(visual);
-            GameObject model = PrefabUtility.InstantiatePrefab(taxOfficerModel.ModelPrefab) as GameObject;
-            if (model == null)
-            {
-                throw new InvalidOperationException("Could not instantiate the tax officer 3D model prefab.");
-            }
-
-            model.name = "TaxOfficer3DModel";
-            model.transform.SetParent(visual, false);
-            ApplyMaterial(model, taxOfficerModel.Material);
-            Animator animator = model.GetComponentInChildren<Animator>(true);
-            if (animator == null)
-            {
-                throw new InvalidOperationException("The tax officer 3D model requires an Animator component.");
-            }
-
-            animator.runtimeAnimatorController = taxOfficerModel.AnimatorController;
-            animator.applyRootMotion = false;
-            TaxOfficerModelAnimator modelAnimator = animator.GetComponent<TaxOfficerModelAnimator>();
-            if (modelAnimator == null)
-            {
-                modelAnimator = animator.gameObject.AddComponent<TaxOfficerModelAnimator>();
-            }
-
-            modelAnimator.Configure(
-                animator,
-                root.GetComponent<PlayerMotor>(),
-                root.GetComponent<ExplorationInputReader>());
+            GameObject visual = CreateObject("SdVisual", root.transform);
+            visual.transform.localPosition = Vector3.zero;
+            SpriteRenderer spriteRenderer = visual.AddComponent<SpriteRenderer>();
+            spriteRenderer.sortingOrder = 40;
+            spriteRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            spriteRenderer.receiveShadows = false;
+            visual.AddComponent<DirectionalSpritePresenter>();
 
             Transform sensorOrigin = CreateObject("SensorOrigin", root.transform).transform;
             sensorOrigin.localPosition = new Vector3(0f, 1.05f, 0f);
@@ -377,6 +518,7 @@ namespace DemonLord.Editor
             SpawnPoint researcherCheckpoint = CreateSpawnPoint(entryPoints, "researcher_briefed", new Vector3(11.2f, 0.05f, -2.55f));
             SpawnPoint ledgerCheckpoint = CreateSpawnPoint(entryPoints, "tax_ledger_reviewed", new Vector3(-11.2f, 0.05f, -2.35f));
             SpawnPoint archiveCheckpoint = CreateSpawnPoint(entryPoints, "archive_catalogued", new Vector3(0f, 0.05f, 7.15f));
+            SpawnPoint combatLiaisonCheckpoint = CreateSpawnPoint(entryPoints, "combat_liaison_briefed", new Vector3(-10.8f, 0.05f, 1.6f));
 
             Transform gameplay = CreateObject("Gameplay", generatedRoot.transform).transform;
             GameObject player = InstantiatePrefab(assets.Prefabs.Player, scene, gameplay, "TaxOfficer");
@@ -405,18 +547,25 @@ namespace DemonLord.Editor
             cameraRig.Configure(gameCamera, player.transform, input, input.Gate);
             motor.ConfigureGroundSafety(0.02f);
             motor.Initialize(input, cameraRig, facing);
+            DirectionalSpritePresenter spritePresenter = player.GetComponentInChildren<DirectionalSpritePresenter>(true);
+            if (spritePresenter == null)
+            {
+                throw new InvalidOperationException("The tax officer SD presenter is missing from the player prefab.");
+            }
+
+            spritePresenter.Configure(facing, motor, input, cameraRig, assets.AnimationSet);
 
             HudReferences hud = BuildHud(scene, generatedRoot.transform, assets.DialogueTheme, assets.DialogueVisuals);
             hud.InGameUiCoordinator.Configure(input, hud.DialogueController, hud.PauseMenuView);
             ConfigureSensor(sensor, input, facing, player.transform, player.transform.Find("SensorOrigin"), hud.Prompt);
-            ConfigureDialogue(hud.DialogueController, input, facing, player.transform, cameraRig, hud.DialogueView, hud.DialogueCanvasGroup, hud.FallbackSpeaker, hud.Body);
+            ConfigureDialogue(hud.DialogueController, input, facing, player.transform, hud.DialogueView, hud.DialogueCanvasGroup, hud.FallbackSpeaker, hud.Body);
 
             Transform environment = CreateObject("Environment", generatedRoot.transform).transform;
             BuildEnvironment(environment, assets.Materials, assets.BureauSeal);
             BuildLocationVolumes(environment, locationTracker);
             LabDoorController archiveAnnexDoor = BuildDoors(gameplay, assets.Materials, hud.Notification);
-            PrototypeInteractable researcher = CreateResearcher(assets.Prefabs.Npc, scene, gameplay, hud.DialogueController, assets.ResearcherSequence);
-            PrototypeInteractable combatLiaison = CreateCombatLiaisonOfficer(assets.Prefabs.Npc, scene, gameplay, hud.DialogueController, assets.CombatLiaisonSequence);
+            PrototypeInteractable researcher = CreateResearcher(assets.Prefabs.Npc, scene, gameplay, hud.DialogueController, assets.ResearcherSequence, assets.Materials.Selection);
+            PrototypeInteractable combatLiaison = CreateCombatLiaisonOfficer(assets.Prefabs.Npc, scene, gameplay, hud.DialogueController, assets.CombatLiaisonSequence, assets.Materials.Selection);
             PrototypeInteractable ledger = CreateLedger(gameplay, assets.Materials, hud.DialogueController);
             PrototypeInteractable analysisConsole = CreateInspectionNode(
                 "WorldlineAnalysisConsole",
@@ -449,7 +598,9 @@ namespace DemonLord.Editor
             FaceAnchorToward(combatLiaison.DialogueCameraAnchor, combatLiaison.FocusPoint.position);
 
             LabProgressController progress = GetOrAdd<LabProgressController>(sceneRoot);
-            progress.Configure(hud.DialogueController, hud.Notification, researcher, ledger, archiveCatalog, archiveAnnexDoor);
+            progress.Configure(hud.DialogueController, hud.Notification, researcher, ledger, archiveCatalog, combatLiaison, archiveAnnexDoor);
+            BattleHandoffCoordinator battleHandoff = hud.InGameHudView.gameObject.AddComponent<BattleHandoffCoordinator>();
+            battleHandoff.Configure(hud.DialogueController, progress, input, hud.BattlePreparationView, hud.Notification);
 
             BuildCameraZones(environment, cameraRig);
             BuildLighting(generatedRoot.transform);
@@ -464,13 +615,14 @@ namespace DemonLord.Editor
                 cameraRig,
                 sensor,
                 diagnostics,
-                new[] { start, researcherCheckpoint, ledgerCheckpoint, archiveCheckpoint },
+                new[] { start, researcherCheckpoint, ledgerCheckpoint, archiveCheckpoint, combatLiaisonCheckpoint },
                 progress,
                 hud.InGameHudView,
                 locationTracker,
-                hud.InGameUiCoordinator);
+                hud.InGameUiCoordinator,
+                configuredBattleHandoffCoordinator: battleHandoff);
 
-            MarkDirty(shell, diagnostics, progress, locationTracker, start, researcherCheckpoint, ledgerCheckpoint, archiveCheckpoint, controller, input, facing, motor, sensor, gameCamera, cameraRig, hud.DialogueController, hud.DialogueView, hud.Notification, hud.InGameHudView, hud.PauseMenuView, hud.InGameUiCoordinator, researcher, combatLiaison, ledger, analysisConsole, archiveCatalog, annexCabinet);
+            MarkDirty(shell, diagnostics, progress, battleHandoff, locationTracker, start, researcherCheckpoint, ledgerCheckpoint, archiveCheckpoint, combatLiaisonCheckpoint, controller, input, facing, motor, sensor, gameCamera, cameraRig, hud.DialogueController, hud.DialogueView, hud.Notification, hud.InGameHudView, hud.BattlePreparationView, hud.PauseMenuView, hud.InGameUiCoordinator, researcher, combatLiaison, ledger, analysisConsole, archiveCatalog, annexCabinet);
         }
 
         private static SpawnPoint CreateSpawnPoint(Transform parent, string key, Vector3 position)
@@ -595,16 +747,16 @@ namespace DemonLord.Editor
 
         private static void BuildFurniture(Transform parent, LabMaterials materials)
         {
-            CreateVisualCube("ReceptionDesk", parent, new Vector3(0f, 0.7f, 2.8f), new Vector3(4.3f, 1.3f, 0.85f), materials.Furniture);
-            CreateVisualCube("OfficeDesk", parent, new Vector3(-10.4f, 0.7f, 1.4f), new Vector3(2.8f, 1.3f, 1.1f), materials.Furniture);
-            CreateVisualCube("OfficeLedgerShelf", parent, new Vector3(-12.8f, 1.25f, -1.6f), new Vector3(0.55f, 2.5f, 3.8f), materials.Furniture);
-            CreateVisualCube("AnalysisConsole", parent, new Vector3(11.3f, 0.85f, 1.6f), new Vector3(2.4f, 1.6f, 1.2f), materials.Research);
-            CreateVisualCube("AnalysisArcaneCore", parent, new Vector3(9.1f, 0.9f, -1.3f), new Vector3(1.2f, 1.8f, 1.2f), materials.Research);
-            CreateVisualCube("ArchiveShelfA", parent, new Vector3(-3.5f, 1.3f, 8.7f), new Vector3(0.6f, 2.6f, 4.8f), materials.Furniture);
-            CreateVisualCube("ArchiveShelfB", parent, new Vector3(3.5f, 1.3f, 8.7f), new Vector3(0.6f, 2.6f, 4.8f), materials.Furniture);
-            CreateVisualCube("ArchiveShelfC", parent, new Vector3(-2.5f, 1.3f, 16f), new Vector3(0.6f, 2.6f, 3.4f), materials.Furniture);
-            CreateVisualCube("ArchiveShelfD", parent, new Vector3(2.5f, 1.3f, 16f), new Vector3(0.6f, 2.6f, 3.4f), materials.Furniture);
-            CreateVisualCube("RestrictedPlinth", parent, new Vector3(0f, 0.7f, -9.7f), new Vector3(2.6f, 1.3f, 2.6f), materials.Research);
+            CreateObstacleCube("ReceptionDesk", parent, new Vector3(0f, 0.7f, 2.8f), new Vector3(4.3f, 1.3f, 0.85f), materials.Furniture);
+            CreateObstacleCube("OfficeDesk", parent, new Vector3(-10.4f, 0.7f, 1.4f), new Vector3(2.8f, 1.3f, 1.1f), materials.Furniture);
+            CreateObstacleCube("OfficeLedgerShelf", parent, new Vector3(-12.8f, 1.25f, -1.6f), new Vector3(0.55f, 2.5f, 3.8f), materials.Furniture);
+            CreateObstacleCube("AnalysisConsole", parent, new Vector3(11.3f, 0.85f, 1.6f), new Vector3(2.4f, 1.6f, 1.2f), materials.Research);
+            CreateObstacleCube("AnalysisArcaneCore", parent, new Vector3(9.1f, 0.9f, -1.3f), new Vector3(1.2f, 1.8f, 1.2f), materials.Research);
+            CreateObstacleCube("ArchiveShelfA", parent, new Vector3(-3.5f, 1.3f, 8.7f), new Vector3(0.6f, 2.6f, 4.8f), materials.Furniture);
+            CreateObstacleCube("ArchiveShelfB", parent, new Vector3(3.5f, 1.3f, 8.7f), new Vector3(0.6f, 2.6f, 4.8f), materials.Furniture);
+            CreateObstacleCube("ArchiveShelfC", parent, new Vector3(-2.5f, 1.3f, 16f), new Vector3(0.6f, 2.6f, 3.4f), materials.Furniture);
+            CreateObstacleCube("ArchiveShelfD", parent, new Vector3(2.5f, 1.3f, 16f), new Vector3(0.6f, 2.6f, 3.4f), materials.Furniture);
+            CreateObstacleCube("RestrictedPlinth", parent, new Vector3(0f, 0.7f, -9.7f), new Vector3(2.6f, 1.3f, 2.6f), materials.Research);
             CreateDecorativeStairSet("OfficeSlateBrassSteps", parent, new Vector3(-10f, 0f, -2.85f), Vector3.forward, materials.StairsSlateBrass);
             CreateDecorativeStairSet("AnalysisIronCyanSteps", parent, new Vector3(9.1f, 0f, -2.5f), Vector3.forward, materials.StairsIronCyan);
             CreateDecorativeStairSet("ArchiveMarbleIvorySteps", parent, new Vector3(0f, 0f, 14.1f), Vector3.back, materials.StairsMarbleIvory);
@@ -686,6 +838,7 @@ namespace DemonLord.Editor
                 horizontalWall ? new Vector3(1.7f, 0f, 0f) : new Vector3(0f, 0f, 1.7f),
                 accessRequirement,
                 "접근 권한이 없습니다. 문이 잠겨 있습니다.");
+            CreateWorldInteractionIndicator(root.transform, null, controller, new Vector3(0f, 1.55f, 0f), selectionMaterial);
             return controller;
         }
 
@@ -694,12 +847,14 @@ namespace DemonLord.Editor
             Scene scene,
             Transform parent,
             DialogueFocusController dialogueController,
-            DialogueSequence sequence)
+            DialogueSequence sequence,
+            Material indicatorMaterial)
         {
             GameObject instance = InstantiatePrefab(prefab, scene, parent, "WorldlineResearcher");
             instance.transform.SetPositionAndRotation(new Vector3(9.25f, 0f, -0.35f), Quaternion.Euler(0f, 180f, 0f));
             PrototypeInteractable interactable = instance.GetComponent<PrototypeInteractable>();
             ConfigureInteractable(interactable, "worldline-researcher", "세계선 분석 연구원", "대화", dialogueController, instance.GetComponent<PlayerFacing>(), sequence, null);
+            CreateWorldInteractionIndicator(instance.transform, interactable, null, new Vector3(0f, 2.35f, 0f), indicatorMaterial);
             return interactable;
         }
 
@@ -708,7 +863,8 @@ namespace DemonLord.Editor
             Scene scene,
             Transform parent,
             DialogueFocusController dialogueController,
-            DialogueSequence sequence)
+            DialogueSequence sequence,
+            Material indicatorMaterial)
         {
             GameObject instance = InstantiatePrefab(prefab, scene, parent, "CombatLiaisonOfficer");
             instance.transform.SetPositionAndRotation(new Vector3(-12.4f, 0f, 2.55f), Quaternion.Euler(0f, 135f, 0f));
@@ -722,6 +878,8 @@ namespace DemonLord.Editor
                 instance.GetComponent<PlayerFacing>(),
                 sequence,
                 null);
+
+            CreateWorldInteractionIndicator(instance.transform, interactable, null, new Vector3(0f, 2.35f, 0f), indicatorMaterial);
 
             // Future battle work should listen for dialogue completion and filter this stable ID.
             return interactable;
@@ -757,6 +915,7 @@ namespace DemonLord.Editor
             SetObject(serialized, "selectionMarker", marker);
             serialized.ApplyModifiedPropertiesWithoutUndo();
             body.layer = Physics.IgnoreRaycastLayer;
+            CreateWorldInteractionIndicator(root.transform, interactable, null, new Vector3(0f, 1.45f, 0f), materials.Selection);
             return interactable;
         }
 
@@ -790,7 +949,37 @@ namespace DemonLord.Editor
             SetObject(serialized, "selectionMarker", marker);
             serialized.ApplyModifiedPropertiesWithoutUndo();
             body.layer = Physics.IgnoreRaycastLayer;
+            CreateWorldInteractionIndicator(root.transform, interactable, null, new Vector3(0f, 1.45f, 0f), materials.Selection);
             return interactable;
+        }
+
+        private static WorldInteractionIndicator CreateWorldInteractionIndicator(
+            Transform owner,
+            PrototypeInteractable interactable,
+            LabDoorController door,
+            Vector3 localPosition,
+            Material material)
+        {
+            GameObject indicatorRoot = CreateObject("WorldInteractionIndicator", owner);
+            indicatorRoot.transform.localPosition = localPosition;
+            GameObject visual = CreatePrimitiveWithoutCollider(
+                "IndicatorVisual",
+                door != null ? PrimitiveType.Cube : PrimitiveType.Sphere,
+                indicatorRoot.transform,
+                material);
+            visual.transform.localPosition = Vector3.zero;
+            visual.transform.localScale = door != null
+                ? new Vector3(0.20f, 0.20f, 0.20f)
+                : new Vector3(0.17f, 0.24f, 0.17f);
+            visual.transform.localRotation = Quaternion.Euler(0f, 45f, 45f);
+            WorldInteractionIndicator indicator = indicatorRoot.AddComponent<WorldInteractionIndicator>();
+            indicator.Configure(
+                indicatorRoot.transform,
+                visual.GetComponent<Renderer>(),
+                interactable,
+                door,
+                localPosition);
+            return indicator;
         }
 
         private static void BuildCameraZones(Transform parent, QuarterViewCameraRig rig)
@@ -890,6 +1079,15 @@ namespace DemonLord.Editor
             Text roomLabel = CreateText("Room", locationPanel.transform, frontendTheme, 21, TextAnchor.MiddleLeft, new Vector2(20f, 27f), new Vector2(380f, 30f));
             roomLabel.color = frontendTheme.MenuSecondary;
 
+            GameObject objectivePanel = CreateUiPanel("ObjectiveHud", safeAreaObject.transform, new Color(0.045f, 0.07f, 0.105f, 0.94f));
+            SetRect(objectivePanel.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(42f, -148f), new Vector2(420f, 104f), new Vector2(0f, 1f));
+            CanvasGroup objectiveGroup = objectivePanel.AddComponent<CanvasGroup>();
+            Text objectiveState = CreateText("State", objectivePanel.transform, frontendTheme, 32, TextAnchor.MiddleCenter, new Vector2(34f, 52f), new Vector2(52f, 72f));
+            Text objectiveCaption = CreateText("Caption", objectivePanel.transform, frontendTheme, 16, TextAnchor.MiddleLeft, new Vector2(76f, 75f), new Vector2(310f, 24f));
+            objectiveCaption.text = "현재 업무";
+            objectiveCaption.color = frontendTheme.MenuSecondary;
+            Text objectiveLabel = CreateText("Objective", objectivePanel.transform, frontendTheme, 19, TextAnchor.UpperLeft, new Vector2(76f, 48f), new Vector2(318f, 56f));
+
             GameObject statusPanel = CreateUiPanel("ResourceTimeHud", safeAreaObject.transform, new Color(0.06f, 0.09f, 0.13f, 0.90f));
             SetRect(statusPanel.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-42f, -42f), new Vector2(330f, 92f), new Vector2(1f, 1f));
             Text currencyCaption = CreateText("CurrencyCaption", statusPanel.transform, frontendTheme, 18, TextAnchor.MiddleLeft, new Vector2(20f, 62f), new Vector2(150f, 28f));
@@ -899,7 +1097,7 @@ namespace DemonLord.Editor
             timeCaption.text = "시간";
             Text timeValue = CreateText("TimeValue", statusPanel.transform, frontendTheme, 22, TextAnchor.MiddleRight, new Vector2(290f, 27f), new Vector2(120f, 30f));
             InGameHudView inGameHudView = canvasObject.AddComponent<InGameHudView>();
-            inGameHudView.Configure(areaLabel, roomLabel, currencyValue, timeValue);
+            inGameHudView.Configure(areaLabel, roomLabel, currencyValue, timeValue, objectiveGroup, objectiveState, objectiveLabel);
 
             DialogueFocusController controller = canvasObject.AddComponent<DialogueFocusController>();
 
@@ -934,31 +1132,80 @@ namespace DemonLord.Editor
             Image dialoguePanelImage = dialoguePanel.GetComponent<Image>();
             dialoguePanelImage.sprite = dialogueArt.Panel;
             dialoguePanelImage.preserveAspect = false;
+            dialoguePanelImage.type = Image.Type.Sliced;
             SetRect(dialoguePanel.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 205f), new Vector2(1760f, 340f));
 
             Image playerNameplate = CreateImage("TaxOfficerNameplate", dialogueOverlay.transform, Vector2.zero, new Vector2(410f, 82f));
             SetRect(playerNameplate.rectTransform, Vector2.zero, Vector2.zero, new Vector2(98f, 372f), new Vector2(410f, 82f), new Vector2(0f, 0.5f));
             playerNameplate.sprite = dialogueArt.Nameplate;
             playerNameplate.preserveAspect = false;
+            playerNameplate.type = Image.Type.Sliced;
             Text playerName = CreateText("TaxOfficerName", playerNameplate.transform, frontendTheme, 30, TextAnchor.MiddleCenter, new Vector2(0f, 41f), new Vector2(410f, 70f));
 
             Image partnerNameplate = CreateImage("PartnerNameplate", dialogueOverlay.transform, Vector2.zero, new Vector2(410f, 82f));
             SetRect(partnerNameplate.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-98f, 372f), new Vector2(410f, 82f), new Vector2(1f, 0.5f));
             partnerNameplate.sprite = dialogueArt.Nameplate;
             partnerNameplate.preserveAspect = false;
+            partnerNameplate.type = Image.Type.Sliced;
             Text partnerName = CreateText("PartnerName", partnerNameplate.transform, frontendTheme, 30, TextAnchor.MiddleCenter, new Vector2(0f, 41f), new Vector2(410f, 70f));
 
             Text fallbackSpeaker = CreateText("FallbackSpeaker", dialoguePanel.transform, frontendTheme, 25, TextAnchor.MiddleLeft, new Vector2(270f, 275f), new Vector2(980f, 32f));
             fallbackSpeaker.color = Color.clear;
-            Text body = CreateText("DialogueBody", dialoguePanel.transform, frontendTheme, 34, TextAnchor.UpperLeft, new Vector2(270f, 185f), new Vector2(1120f, 130f));
-            Image hintDecoration = CreateImage("ContinuePromptDecoration", dialoguePanel.transform, new Vector2(1090f, 56f), new Vector2(390f, 54f));
+            Text body = CreateText("DialogueBody", dialoguePanel.transform, frontendTheme, 34, TextAnchor.UpperLeft, new Vector2(270f, 235f), new Vector2(1120f, 100f));
+            Image hintDecoration = CreateImage("ContinuePromptDecoration", dialoguePanel.transform, new Vector2(170f, 155f), new Vector2(360f, 54f));
             hintDecoration.sprite = dialogueArt.ContinuePrompt;
             hintDecoration.preserveAspect = false;
-            Text hint = CreateText("DialogueHint", hintDecoration.transform, frontendTheme, 18, TextAnchor.MiddleCenter, new Vector2(0f, 27f), new Vector2(390f, 44f));
-            CreateDialogueButton("AdvanceButton", dialoguePanel.transform, new Vector2(1440f, 55f), new Vector2(200f, 54f), dialogueArt.ChoiceNormal, dialogueArt.ChoiceSelected, dialogueArt.ChoiceDisabled, "다음", controller, false, frontendTheme);
-            CreateDialogueButton("CloseButton", dialoguePanel.transform, new Vector2(1225f, 55f), new Vector2(200f, 54f), dialogueArt.Back, dialogueArt.ChoiceSelected, dialogueArt.ChoiceDisabled, "닫기", controller, true, frontendTheme);
+            Text hint = CreateText("Label", hintDecoration.transform, frontendTheme, 18, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(336f, 50f));
+            FitLabelToParent(hint.rectTransform, new Vector2(24f, 8f));
+            CreateDialogueButton("AdvanceButton", dialoguePanel.transform, new Vector2(1345f, 155f), new Vector2(190f, 54f), dialogueArt.ChoiceNormal, dialogueArt.ChoiceSelected, dialogueArt.ChoiceDisabled, "다음", controller, false, frontendTheme);
+            CreateDialogueButton("CloseButton", dialoguePanel.transform, new Vector2(1140f, 155f), new Vector2(190f, 54f), dialogueArt.Back, dialogueArt.ChoiceSelected, dialogueArt.ChoiceDisabled, "닫기", controller, true, frontendTheme);
 
             DialogueView dialogueView = dialogueOverlay.AddComponent<DialogueView>();
+            Text autoModeText = CreateDialogueViewButton(
+                "AutoButton",
+                dialoguePanel.transform,
+                new Vector2(750f, 155f),
+                new Vector2(180f, 54f),
+                dialogueArt.ChoiceNormal,
+                dialogueArt.ChoiceSelected,
+                "자동 OFF",
+                dialogueView,
+                true,
+                frontendTheme);
+            CreateDialogueViewButton(
+                "HistoryButton",
+                dialoguePanel.transform,
+                new Vector2(555f, 155f),
+                new Vector2(180f, 54f),
+                dialogueArt.ChoiceNormal,
+                dialogueArt.ChoiceSelected,
+                "대화 기록",
+                dialogueView,
+                false,
+                frontendTheme);
+            CreateDialogueSkipButton(
+                "SkipButton",
+                dialoguePanel.transform,
+                new Vector2(945f, 155f),
+                new Vector2(180f, 54f),
+                dialogueArt.ChoiceNormal,
+                dialogueArt.ChoiceSelected,
+                "전체 스킵",
+                controller,
+                frontendTheme);
+
+            GameObject historyPanel = CreateUiPanel("DialogueHistory", dialogueOverlay.transform, new Color(0.025f, 0.035f, 0.055f, 0.985f));
+            SetRect(historyPanel.GetComponent<RectTransform>(), Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(1120f, 700f), Vector2.one * 0.5f);
+            CanvasGroup historyGroup = historyPanel.AddComponent<CanvasGroup>();
+            Text historyTitle = CreateText("Title", historyPanel.transform, frontendTheme, 32, TextAnchor.MiddleCenter, new Vector2(560f, 654f), new Vector2(1000f, 54f));
+            historyTitle.text = "대화 기록";
+            Text historyText = CreateText("History", historyPanel.transform, frontendTheme, 23, TextAnchor.UpperLeft, new Vector2(64f, 580f), new Vector2(992f, 520f));
+            historyText.fontStyle = FontStyle.Normal;
+            historyText.lineSpacing = 1.1f;
+            Text historyHelp = CreateText("Help", historyPanel.transform, frontendTheme, 18, TextAnchor.MiddleCenter, new Vector2(560f, 32f), new Vector2(800f, 34f));
+            historyHelp.text = "대화 기록 버튼 또는 F / Enter로 닫기";
+            historyHelp.color = frontendTheme.MenuSecondary;
+
             SerializedObject dialogueViewSerialized = new SerializedObject(dialogueView);
             SetObject(dialogueViewSerialized, "panelRoot", dialogueOverlay);
             SetObject(dialogueViewSerialized, "canvasGroup", dialogueGroup);
@@ -970,6 +1217,9 @@ namespace DemonLord.Editor
             SetObject(dialogueViewSerialized, "partnerNameLabel", partnerName);
             SetObject(dialogueViewSerialized, "bodyLabel", body);
             SetObject(dialogueViewSerialized, "hintLabel", hint);
+            SetObject(dialogueViewSerialized, "historyGroup", historyGroup);
+            SetObject(dialogueViewSerialized, "historyLabel", historyText);
+            SetObject(dialogueViewSerialized, "autoModeLabel", autoModeText);
             SetObject(dialogueViewSerialized, "theme", theme);
             dialogueViewSerialized.ApplyModifiedPropertiesWithoutUndo();
 
@@ -982,6 +1232,22 @@ namespace DemonLord.Editor
             SetObject(notificationSerialized, "canvasGroup", notificationGroup);
             SetObject(notificationSerialized, "messageLabel", notificationText);
             notificationSerialized.ApplyModifiedPropertiesWithoutUndo();
+
+            GameObject battleOverlay = CreateUiPanel("BattlePreparationOverlay", canvasObject.transform, new Color(0.01f, 0.015f, 0.025f, 0.84f));
+            SetStretch(battleOverlay.GetComponent<RectTransform>());
+            CanvasGroup battleGroup = battleOverlay.AddComponent<CanvasGroup>();
+
+            GameObject battleCard = CreateUiPanel("BattlePreparationCard", battleOverlay.transform, new Color(0.055f, 0.065f, 0.085f, 0.985f));
+            SetRect(battleCard.GetComponent<RectTransform>(), Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(780f, 460f), Vector2.one * 0.5f);
+            Text battleTitle = CreateText("Title", battleCard.transform, frontendTheme, 36, TextAnchor.MiddleCenter, new Vector2(390f, 405f), new Vector2(680f, 58f));
+            Text battleDetail = CreateText("Detail", battleCard.transform, frontendTheme, 25, TextAnchor.UpperLeft, new Vector2(70f, 320f), new Vector2(640f, 175f));
+            battleDetail.fontStyle = FontStyle.Normal;
+            Text battleStatus = CreateText("Status", battleCard.transform, frontendTheme, 21, TextAnchor.MiddleCenter, new Vector2(390f, 128f), new Vector2(660f, 64f));
+            battleStatus.color = frontendTheme.MenuSecondary;
+            Button battleDispatchButton = CreatePanelButton("DispatchButton", battleCard.transform, new Vector2(205f, 60f), new Vector2(270f, 68f), "출동 요청", dialogueArt.ChoiceNormal, dialogueArt.ChoiceSelected, frontendTheme);
+            Button battleCloseButton = CreatePanelButton("CloseButton", battleCard.transform, new Vector2(575f, 60f), new Vector2(270f, 68f), "닫기", dialogueArt.Back, dialogueArt.ChoiceSelected, frontendTheme);
+            BattlePreparationView battlePreparationView = battleOverlay.AddComponent<BattlePreparationView>();
+            battlePreparationView.Configure(battleGroup, battleTitle, battleDetail, battleStatus, battleDispatchButton, battleCloseButton);
 
             GameObject pauseOverlayObject = new GameObject("PauseOverlay", typeof(RectTransform), typeof(CanvasGroup));
             pauseOverlayObject.transform.SetParent(canvasObject.transform, false);
@@ -997,7 +1263,7 @@ namespace DemonLord.Editor
                 AssetDatabase.LoadAssetAtPath<AudioClip>(SaveCompleteSfxPath));
             InGameUiCoordinator inGameUiCoordinator = canvasObject.AddComponent<InGameUiCoordinator>();
 
-            return new HudReferences(prompt, controller, dialogueView, notification, dialogueGroup, fallbackSpeaker, body, inGameHudView, pauseMenuView, inGameUiCoordinator);
+            return new HudReferences(prompt, controller, dialogueView, notification, dialogueGroup, fallbackSpeaker, body, inGameHudView, battlePreparationView, pauseMenuView, inGameUiCoordinator);
         }
 
         private static void ConfigureSensor(InteractionSensor sensor, ExplorationInputReader input, PlayerFacing facing, Transform playerRoot, Transform sensorOrigin, InteractionPromptView prompt)
@@ -1024,13 +1290,12 @@ namespace DemonLord.Editor
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        private static void ConfigureDialogue(DialogueFocusController controller, ExplorationInputReader input, PlayerFacing facing, Transform playerRoot, QuarterViewCameraRig cameraRig, DialogueView view, CanvasGroup group, Text speaker, Text line)
+        private static void ConfigureDialogue(DialogueFocusController controller, ExplorationInputReader input, PlayerFacing facing, Transform playerRoot, DialogueView view, CanvasGroup group, Text speaker, Text line)
         {
             SerializedObject serialized = new SerializedObject(controller);
             SetObject(serialized, "inputReader", input);
             SetObject(serialized, "playerFacing", facing);
             SetObject(serialized, "playerRoot", playerRoot);
-            SetObject(serialized, "cameraRig", cameraRig);
             SetObject(serialized, "dialogueView", view);
             SetObject(serialized, "dialogueCanvasGroup", group);
             SetObject(serialized, "speakerLabel", speaker);
@@ -1075,6 +1340,30 @@ namespace DemonLord.Editor
             if (sprite == null)
             {
                 throw new InvalidOperationException("Image did not import as a sprite: " + path);
+            }
+
+            return sprite;
+        }
+
+        private static Sprite LoadSlicedSprite(string path, Vector4 border)
+        {
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer == null)
+            {
+                throw new InvalidOperationException("Required sliced image is missing: " + path);
+            }
+
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.spriteBorder = border;
+            importer.SaveAndReimport();
+
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (sprite == null)
+            {
+                throw new InvalidOperationException("Image did not import as a sliced sprite: " + path);
             }
 
             return sprite;
@@ -1215,6 +1504,7 @@ namespace DemonLord.Editor
                 "researcher_briefed",
                 "tax_ledger_reviewed",
                 "archive_catalogued",
+                "combat_liaison_briefed",
             };
             foreach (string requiredSpawn in requiredCheckpointSpawns)
             {
@@ -1265,16 +1555,18 @@ namespace DemonLord.Editor
                 throw new InvalidOperationException("World Adjustment Lab requires a locked door.");
             }
 
-            Animator taxOfficerAnimator = generated.GetComponentsInChildren<Animator>(true)
-                .FirstOrDefault(candidate => candidate.name == "TaxOfficer3DModel");
-            if (taxOfficerAnimator == null || taxOfficerAnimator.runtimeAnimatorController == null)
+            DirectionalSpritePresenter[] taxOfficerPresenters = generated
+                .GetComponentsInChildren<DirectionalSpritePresenter>(true);
+            if (taxOfficerPresenters.Length != 1
+                || taxOfficerPresenters[0].GetComponent<SpriteRenderer>() == null)
             {
-                throw new InvalidOperationException("The tax officer 3D model requires an Animator and motion controller.");
+                throw new InvalidOperationException("The lab requires exactly one SD tax officer sprite presenter.");
             }
 
-            if (generated.GetComponentsInChildren<DirectionalSpritePresenter>(true).Length != 0)
+            if (generated.GetComponentsInChildren<TaxOfficerModelAnimator>(true).Length != 0
+                || HasDescendantNamed(generated, "TaxOfficer3DModel"))
             {
-                throw new InvalidOperationException("The temporary 2D tax officer presenter must not remain in the 3D lab slice.");
+                throw new InvalidOperationException("The retired 3D tax officer visual must not remain in the SD lab slice.");
             }
 
             DialogueSequence sequence = AssetDatabase.LoadAssetAtPath<DialogueSequence>(ScriptableObjectFolder + "/WorldlineResearcherIntroduction.asset");
@@ -1495,6 +1787,18 @@ namespace DemonLord.Editor
             return cube;
         }
 
+        private static GameObject CreateObstacleCube(
+            string name,
+            Transform parent,
+            Vector3 position,
+            Vector3 scale,
+            Material material)
+        {
+            GameObject cube = CreateVisualCube(name, parent, position, scale, material);
+            cube.AddComponent<BoxCollider>();
+            return cube;
+        }
+
         private static void ApplyMaterial(GameObject root, Material material)
         {
             if (root == null || material == null)
@@ -1570,6 +1874,8 @@ namespace DemonLord.Editor
             SetRect(objectRoot.GetComponent<RectTransform>(), Vector2.zero, Vector2.zero, position, size);
 
             Text text = CreateText("Label", objectRoot.transform, theme, 22, TextAnchor.MiddleCenter, new Vector2(0f, size.y * 0.5f), size - new Vector2(28f, 8f));
+            FitLabelToParent(text.rectTransform, new Vector2(28f, 8f));
+            text.text = label;
             text.color = new Color(0.97f, 0.92f, 0.78f, 1f);
             if (closeDialogue)
             {
@@ -1579,6 +1885,105 @@ namespace DemonLord.Editor
             {
                 UnityEventTools.AddPersistentListener(button.onClick, controller.AdvanceDialogue);
             }
+        }
+
+        private static Text CreateDialogueViewButton(
+            string name,
+            Transform parent,
+            Vector2 position,
+            Vector2 size,
+            Sprite normalSprite,
+            Sprite selectedSprite,
+            string label,
+            DialogueView view,
+            bool toggleAuto,
+            FrontendUiTheme theme)
+        {
+            GameObject objectRoot = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            objectRoot.transform.SetParent(parent, false);
+            Image image = objectRoot.GetComponent<Image>();
+            image.sprite = normalSprite;
+            image.preserveAspect = false;
+            image.type = Image.Type.Sliced;
+            Button button = objectRoot.GetComponent<Button>();
+            button.targetGraphic = image;
+            button.transition = Selectable.Transition.SpriteSwap;
+            SpriteState state = button.spriteState;
+            state.highlightedSprite = selectedSprite;
+            state.pressedSprite = selectedSprite;
+            state.selectedSprite = selectedSprite;
+            button.spriteState = state;
+            SetRect(objectRoot.GetComponent<RectTransform>(), Vector2.zero, Vector2.zero, position, size);
+            Text text = CreateText("Label", objectRoot.transform, theme, 20, TextAnchor.MiddleCenter, new Vector2(0f, size.y * 0.5f), size - new Vector2(24f, 8f));
+            FitLabelToParent(text.rectTransform, new Vector2(24f, 8f));
+            text.text = label;
+            text.color = new Color(0.97f, 0.92f, 0.78f, 1f);
+            if (toggleAuto)
+            {
+                UnityEventTools.AddPersistentListener(button.onClick, view.ToggleAuto);
+            }
+            else
+            {
+                UnityEventTools.AddPersistentListener(button.onClick, view.ToggleHistory);
+            }
+
+            return text;
+        }
+
+        private static void CreateDialogueSkipButton(
+            string name,
+            Transform parent,
+            Vector2 position,
+            Vector2 size,
+            Sprite normalSprite,
+            Sprite selectedSprite,
+            string label,
+            DialogueFocusController controller,
+            FrontendUiTheme theme)
+        {
+            Button button = CreatePanelButton(name, parent, position, size, label, normalSprite, selectedSprite, theme);
+            UnityEventTools.AddPersistentListener(button.onClick, controller.SkipDialogue);
+        }
+
+        private static Button CreatePanelButton(
+            string name,
+            Transform parent,
+            Vector2 position,
+            Vector2 size,
+            string label,
+            Sprite normalSprite,
+            Sprite selectedSprite,
+            FrontendUiTheme theme)
+        {
+            GameObject objectRoot = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            objectRoot.transform.SetParent(parent, false);
+            Image image = objectRoot.GetComponent<Image>();
+            image.sprite = normalSprite;
+            image.preserveAspect = false;
+            image.type = Image.Type.Sliced;
+            Button button = objectRoot.GetComponent<Button>();
+            button.targetGraphic = image;
+            button.transition = Selectable.Transition.SpriteSwap;
+            SpriteState state = button.spriteState;
+            state.highlightedSprite = selectedSprite;
+            state.pressedSprite = selectedSprite;
+            state.selectedSprite = selectedSprite;
+            button.spriteState = state;
+            SetRect(objectRoot.GetComponent<RectTransform>(), Vector2.zero, Vector2.zero, position, size);
+            Text text = CreateText("Label", objectRoot.transform, theme, 24, TextAnchor.MiddleCenter, new Vector2(0f, size.y * 0.5f), size - new Vector2(28f, 10f));
+            FitLabelToParent(text.rectTransform, new Vector2(28f, 10f));
+            text.text = label;
+            text.color = new Color(0.97f, 0.92f, 0.78f, 1f);
+            return button;
+        }
+
+        private static void FitLabelToParent(RectTransform label, Vector2 padding)
+        {
+            label.anchorMin = Vector2.zero;
+            label.anchorMax = Vector2.one;
+            label.pivot = new Vector2(0.5f, 0.5f);
+            label.anchoredPosition = Vector2.zero;
+            label.sizeDelta = -padding;
         }
 
         private static Text CreateText(string name, Transform parent, FrontendUiTheme theme, int fontSize, TextAnchor alignment, Vector2 position, Vector2 size)
@@ -1775,6 +2180,7 @@ namespace DemonLord.Editor
             public DialogueVisualAssets(
                 Sprite taxOfficerPortrait,
                 Sprite researcherPortrait,
+                Sprite combatLiaisonPortrait,
                 Sprite panel,
                 Sprite nameplate,
                 Sprite continuePrompt,
@@ -1785,6 +2191,7 @@ namespace DemonLord.Editor
             {
                 TaxOfficerPortrait = taxOfficerPortrait;
                 ResearcherPortrait = researcherPortrait;
+                CombatLiaisonPortrait = combatLiaisonPortrait;
                 Panel = panel;
                 Nameplate = nameplate;
                 ContinuePrompt = continuePrompt;
@@ -1796,6 +2203,7 @@ namespace DemonLord.Editor
 
             public Sprite TaxOfficerPortrait { get; }
             public Sprite ResearcherPortrait { get; }
+            public Sprite CombatLiaisonPortrait { get; }
             public Sprite Panel { get; }
             public Sprite Nameplate { get; }
             public Sprite ContinuePrompt { get; }
@@ -1893,6 +2301,7 @@ namespace DemonLord.Editor
                 Text fallbackSpeaker,
                 Text body,
                 InGameHudView inGameHudView,
+                BattlePreparationView battlePreparationView,
                 PauseMenuView pauseMenuView,
                 InGameUiCoordinator inGameUiCoordinator)
             {
@@ -1904,6 +2313,7 @@ namespace DemonLord.Editor
                 FallbackSpeaker = fallbackSpeaker;
                 Body = body;
                 InGameHudView = inGameHudView;
+                BattlePreparationView = battlePreparationView;
                 PauseMenuView = pauseMenuView;
                 InGameUiCoordinator = inGameUiCoordinator;
             }
@@ -1916,6 +2326,7 @@ namespace DemonLord.Editor
             public Text FallbackSpeaker { get; }
             public Text Body { get; }
             public InGameHudView InGameHudView { get; }
+            public BattlePreparationView BattlePreparationView { get; }
             public PauseMenuView PauseMenuView { get; }
             public InGameUiCoordinator InGameUiCoordinator { get; }
         }

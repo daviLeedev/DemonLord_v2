@@ -9,7 +9,9 @@ namespace DemonLord.Presentation.Exploration
     {
         [SerializeField] private CanvasGroup rootGroup;
         [SerializeField] private RawImage mapImage;
+        [SerializeField] private RawImage navigationOverlayImage;
         [SerializeField] private RectTransform playerMarker;
+        [SerializeField] private RectTransform objectiveMarker;
         [SerializeField] private Text floorLabel;
         private Sprite currentSprite;
         private Rect currentUvRect;
@@ -17,16 +19,28 @@ namespace DemonLord.Presentation.Exploration
         private float currentMarkerYaw = float.NaN;
         private bool warnedMissingData;
 
-        public void Configure(CanvasGroup group, RawImage image, RectTransform marker, Text floor)
+        public void Configure(
+            CanvasGroup group,
+            RawImage image,
+            RawImage overlayImage,
+            RectTransform marker,
+            RectTransform configuredObjectiveMarker,
+            Text floor)
         {
             rootGroup = group;
             mapImage = image;
+            navigationOverlayImage = overlayImage;
             playerMarker = marker;
+            objectiveMarker = configuredObjectiveMarker;
             floorLabel = floor;
             SetVisible(false);
         }
 
-        public void Render(MapFloorDefinition floor, Vector2 playerNormalized, float facingYaw)
+        public void Render(
+            MapFloorDefinition floor,
+            Vector2 playerNormalized,
+            float facingYaw,
+            Vector2? objectiveNormalized = null)
         {
             if (floor == null || floor.BackgroundSprite == null || mapImage == null || playerMarker == null)
             {
@@ -57,6 +71,8 @@ namespace DemonLord.Presentation.Exploration
                 mapImage.uvRect = textureUv;
             }
 
+            RenderNavigationOverlay(floor.NavigationOverlaySprite, localUv);
+
             Vector2 markerPosition = MapProjection.CalculateMiniMapMarkerPosition(
                 playerNormalized,
                 localUv,
@@ -67,10 +83,30 @@ namespace DemonLord.Presentation.Exploration
                 playerMarker.anchoredPosition = markerPosition;
             }
 
+            bool showObjective = objectiveMarker != null && objectiveNormalized.HasValue;
+            if (objectiveMarker != null && objectiveMarker.gameObject.activeSelf != showObjective)
+            {
+                objectiveMarker.gameObject.SetActive(showObjective);
+            }
+
+            if (showObjective)
+            {
+                objectiveMarker.anchoredPosition = MapProjection.CalculateMiniMapMarkerPosition(
+                    objectiveNormalized.Value,
+                    localUv,
+                    mapImage.rectTransform.rect.size);
+            }
+
             if (float.IsNaN(currentMarkerYaw) || Mathf.Abs(Mathf.DeltaAngle(currentMarkerYaw, facingYaw)) > 0.01f)
             {
                 currentMarkerYaw = facingYaw;
-                playerMarker.localEulerAngles = new Vector3(0f, 0f, -facingYaw);
+                playerMarker.localEulerAngles = new Vector3(
+                    0f,
+                    0f,
+                    MapProjection.CalculateMarkerRotationDegrees(
+                        facingYaw,
+                        floor,
+                        mapImage.rectTransform.rect.size));
             }
 
             if (floorLabel != null && !string.Equals(floorLabel.text, floor.DisplayName, StringComparison.Ordinal))
@@ -80,6 +116,20 @@ namespace DemonLord.Presentation.Exploration
         }
 
         public void Hide() => SetVisible(false);
+
+        private void RenderNavigationOverlay(Sprite overlaySprite, Rect localUv)
+        {
+            if (navigationOverlayImage == null) return;
+            bool visible = overlaySprite != null && overlaySprite.texture != null;
+            if (navigationOverlayImage.gameObject.activeSelf != visible)
+            {
+                navigationOverlayImage.gameObject.SetActive(visible);
+            }
+
+            if (!visible) return;
+            navigationOverlayImage.texture = overlaySprite.texture;
+            navigationOverlayImage.uvRect = ToTextureUv(overlaySprite, localUv);
+        }
 
         private void SetVisible(bool visible)
         {

@@ -40,15 +40,17 @@ namespace DemonLord.EditorTools
             SessionState.SetBool(RunActiveKey, true);
             ExplorationPlayModeCallbacks callbacks = RegisterCallbacks(previousStartScenePath);
 
-            // Starting directly in the self-contained test target prevents the persistent
-            // boot flow from replacing the Test Runner's scene before its first coroutine.
+            // The Test Framework must own the PlayMode start scene so it can load its
+            // temporary InitTestScene. Individual tests load 90_GameShell themselves.
+            // The project bootstrapper observes RunActiveKey and therefore will not
+            // replace the framework scene with 00_Boot during this run.
             SceneAsset gameShellScene = AssetDatabase.LoadAssetAtPath<SceneAsset>(GameShellScenePath);
             if (gameShellScene == null)
             {
                 throw new InvalidOperationException("PlayMode test start scene is missing: " + GameShellScenePath);
             }
 
-            EditorSceneManager.playModeStartScene = gameShellScene;
+            EditorSceneManager.playModeStartScene = null;
 
             TestRunnerApi api = ScriptableObject.CreateInstance<TestRunnerApi>();
             ExecutionSettings settings = new ExecutionSettings(new Filter
@@ -128,11 +130,13 @@ namespace DemonLord.EditorTools
 
             public void RunFinished(ITestResultAdaptor result)
             {
+                int batchModeExitCode = 2;
                 try
                 {
                     string path = string.IsNullOrWhiteSpace(resultPath) ? ResultsPath : resultPath;
                     Directory.CreateDirectory(Path.GetDirectoryName(path) ?? UnityEngine.Application.persistentDataPath);
                     TestRunnerApi.SaveResultToFile(result, path);
+                    batchModeExitCode = result.FailCount == 0 && result.InconclusiveCount == 0 ? 0 : 2;
 
                     string summary =
                         $"DemonLord PlayMode tests finished. Passed={result.PassCount}, "
@@ -148,6 +152,10 @@ namespace DemonLord.EditorTools
                         Debug.LogError(summary);
                     }
                 }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
                 finally
                 {
                     RestorePlayModeStartScene();
@@ -155,6 +163,11 @@ namespace DemonLord.EditorTools
                     SessionState.EraseString(PreviousStartSceneKey);
                     TestRunnerApi.UnregisterTestCallback(this);
                     DestroyImmediate(this);
+
+                    if (UnityEngine.Application.isBatchMode)
+                    {
+                        EditorApplication.Exit(batchModeExitCode);
+                    }
                 }
             }
 
