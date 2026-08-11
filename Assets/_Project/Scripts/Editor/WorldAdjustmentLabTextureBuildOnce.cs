@@ -1,4 +1,6 @@
 #if UNITY_EDITOR
+using System;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -12,11 +14,17 @@ namespace DemonLord.Editor
         // The laboratory builder owns the source player/camera/UI hierarchy.
         // The area builder must always run after it because it binds persistent
         // shell services to those freshly-created objects.
-        private const string RunKey = "DemonLord.WorldAdjustmentLab.IntegratedAreaBuild.V2";
+        private const string RunKey = "DemonLord.WorldAdjustmentLab.IntegratedAreaBuild.V3";
 
         [InitializeOnLoadMethod]
         private static void Schedule()
         {
+            if (Environment.GetCommandLineArgs().Any(
+                    argument => string.Equals(argument, "-runTests", StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
             if (SessionState.GetBool(RunKey, false))
             {
                 return;

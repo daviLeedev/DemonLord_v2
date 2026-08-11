@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using DemonLord.Presentation;
+using DemonLord.Presentation.Combat;
 using DemonLord.Presentation.Exploration;
 using UnityEditor;
 using UnityEditor.Animations;
@@ -26,6 +27,8 @@ namespace DemonLord.Editor
         private const string TaxOfficerSpriteFolder = "Assets/_Project/Art/Characters/TaxOfficer/Placeholder";
         private const string DialoguePortraitFolder = "Assets/_Project/Art/Dialogue/Portraits";
         private const string DialogueArtFolder = "Assets/_Project/Art/UI/Dialogue";
+        private const string CombatTrainingLineupPath = "Assets/_Project/Art/Combat/combat_training_lineup_v1.png";
+        private const string CombatTrainingBackdropPath = "Assets/_Project/Art/Combat/combat_training_backdrop_v1.png";
         private const string TaxOfficerPortraitPath = DialoguePortraitFolder + "/tax_officer_dialogue_profile_v2.png";
         private const string ResearcherPortraitPath = DialoguePortraitFolder + "/worldline_researcher_dialogue_profile_v2.png";
         private const string SealPath = "Assets/_Project/Art/Prototype/WorldAdjustmentLab/bureau_seal_decal.png";
@@ -233,8 +236,8 @@ namespace DemonLord.Editor
             DialogueLine[] lines =
             {
                 CreateDialogueLine(DialogueSpeakerSide.Partner, "세무관님, 조정 대상의 적대 반응이 확인됐습니다."),
-                CreateDialogueLine(DialogueSpeakerSide.Player, "전투 구역 좌표와 현장 기록부터 확보해 주세요."),
-                CreateDialogueLine(DialogueSpeakerSide.Partner, "좌표는 확보했습니다. 출동 승인이 내려오면 즉시 안내하겠습니다."),
+                CreateDialogueLine(DialogueSpeakerSide.Partner, "좌측의 작은 아군 목록에서 대상을 고르면 바로 옆에 그 인원의 기술이 표시됩니다. 붉은 곡선 화살은 적의 공개 행동입니다."),
+                CreateDialogueLine(DialogueSpeakerSide.Partner, "공유 SP 안에서 각자 기술을 고르면, 기술의 속도에 따라 아군과 적의 행동선이 다시 정렬됩니다. 다음을 누르면 시작합니다."),
             };
             sequence.Configure(player, partner, lines);
             EditorUtility.SetDirty(sequence);
@@ -408,6 +411,11 @@ namespace DemonLord.Editor
 
             HudReferences hud = BuildHud(scene, generatedRoot.transform, assets.DialogueTheme, assets.DialogueVisuals);
             hud.InGameUiCoordinator.Configure(input, hud.DialogueController, hud.PauseMenuView);
+            hud.CombatTrainingCoordinator.Configure(
+                hud.DialogueController,
+                input,
+                hud.InGameUiCoordinator,
+                hud.CombatTrainingView);
             ConfigureSensor(sensor, input, facing, player.transform, player.transform.Find("SensorOrigin"), hud.Prompt);
             ConfigureDialogue(hud.DialogueController, input, facing, player.transform, cameraRig, hud.DialogueView, hud.DialogueCanvasGroup, hud.FallbackSpeaker, hud.Body);
 
@@ -468,9 +476,10 @@ namespace DemonLord.Editor
                 progress,
                 hud.InGameHudView,
                 locationTracker,
-                hud.InGameUiCoordinator);
+                hud.InGameUiCoordinator,
+                configuredCombatTrainingCoordinator: hud.CombatTrainingCoordinator);
 
-            MarkDirty(shell, diagnostics, progress, locationTracker, start, researcherCheckpoint, ledgerCheckpoint, archiveCheckpoint, controller, input, facing, motor, sensor, gameCamera, cameraRig, hud.DialogueController, hud.DialogueView, hud.Notification, hud.InGameHudView, hud.PauseMenuView, hud.InGameUiCoordinator, researcher, combatLiaison, ledger, analysisConsole, archiveCatalog, annexCabinet);
+            MarkDirty(shell, diagnostics, progress, locationTracker, start, researcherCheckpoint, ledgerCheckpoint, archiveCheckpoint, controller, input, facing, motor, sensor, gameCamera, cameraRig, hud.DialogueController, hud.DialogueView, hud.Notification, hud.InGameHudView, hud.PauseMenuView, hud.InGameUiCoordinator, hud.CombatTrainingView, hud.CombatTrainingCoordinator, researcher, combatLiaison, ledger, analysisConsole, archiveCatalog, annexCabinet);
         }
 
         private static SpawnPoint CreateSpawnPoint(Transform parent, string key, Vector3 position)
@@ -723,7 +732,7 @@ namespace DemonLord.Editor
                 sequence,
                 null);
 
-            // Future battle work should listen for dialogue completion and filter this stable ID.
+            // CombatTrainingCoordinator listens for completed dialogue and filters this stable ID.
             return interactable;
         }
 
@@ -997,7 +1006,30 @@ namespace DemonLord.Editor
                 AssetDatabase.LoadAssetAtPath<AudioClip>(SaveCompleteSfxPath));
             InGameUiCoordinator inGameUiCoordinator = canvasObject.AddComponent<InGameUiCoordinator>();
 
-            return new HudReferences(prompt, controller, dialogueView, notification, dialogueGroup, fallbackSpeaker, body, inGameHudView, pauseMenuView, inGameUiCoordinator);
+            GameObject combatOverlayObject = new GameObject("CombatTrainingOverlay", typeof(RectTransform), typeof(CanvasGroup));
+            combatOverlayObject.transform.SetParent(canvasObject.transform, false);
+            SetStretch(combatOverlayObject.GetComponent<RectTransform>());
+            CombatTrainingView combatTrainingView = combatOverlayObject.AddComponent<CombatTrainingView>();
+            combatTrainingView.Configure(
+                frontendTheme.Font,
+                eventSystem,
+                LoadSingleSprite(CombatTrainingLineupPath),
+                LoadSingleSprite(CombatTrainingBackdropPath));
+            CombatTrainingCoordinator combatTrainingCoordinator = canvasObject.AddComponent<CombatTrainingCoordinator>();
+
+            return new HudReferences(
+                prompt,
+                controller,
+                dialogueView,
+                notification,
+                dialogueGroup,
+                fallbackSpeaker,
+                body,
+                inGameHudView,
+                pauseMenuView,
+                inGameUiCoordinator,
+                combatTrainingView,
+                combatTrainingCoordinator);
         }
 
         private static void ConfigureSensor(InteractionSensor sensor, ExplorationInputReader input, PlayerFacing facing, Transform playerRoot, Transform sensorOrigin, InteractionPromptView prompt)
@@ -1190,7 +1222,8 @@ namespace DemonLord.Editor
                 || gameShellRoot.GameCamera == null
                 || gameShellRoot.InGameHudView == null
                 || gameShellRoot.LocationTracker == null
-                || gameShellRoot.InGameUiCoordinator == null)
+                || gameShellRoot.InGameUiCoordinator == null
+                || gameShellRoot.CombatTrainingCoordinator == null)
             {
                 throw new InvalidOperationException("GameShellRoot has missing exploration or in-game UI references.");
             }
@@ -1315,9 +1348,25 @@ namespace DemonLord.Editor
 
             if (generated.GetComponentsInChildren<InGameHudView>(true).Length != 1
                 || generated.GetComponentsInChildren<PauseMenuView>(true).Length != 1
-                || generated.GetComponentsInChildren<InGameUiCoordinator>(true).Length != 1)
+                || generated.GetComponentsInChildren<InGameUiCoordinator>(true).Length != 1
+                || generated.GetComponentsInChildren<CombatTrainingView>(true).Length != 1
+                || generated.GetComponentsInChildren<CombatTrainingCoordinator>(true).Length != 1)
             {
-                throw new InvalidOperationException("World Adjustment Lab requires exactly one HUD and pause menu coordinator.");
+                throw new InvalidOperationException("World Adjustment Lab requires exactly one HUD, pause menu and combat training coordinator.");
+            }
+
+            CombatTrainingView combatTrainingView = generated.GetComponentInChildren<CombatTrainingView>(true);
+            if (combatTrainingView.OverlayGroup == null
+                || combatTrainingView.OverlayGroup.alpha != 0f
+                || combatTrainingView.OverlayGroup.interactable
+                || combatTrainingView.OverlayGroup.blocksRaycasts)
+            {
+                throw new InvalidOperationException("Combat training overlay must be serialized hidden and non-blocking.");
+            }
+
+            if (!combatTrainingView.TryValidateConfiguration(out string combatViewError))
+            {
+                throw new InvalidOperationException("Combat training view is invalid: " + combatViewError);
             }
 
             string[] requiredLocationIds =
@@ -1894,7 +1943,9 @@ namespace DemonLord.Editor
                 Text body,
                 InGameHudView inGameHudView,
                 PauseMenuView pauseMenuView,
-                InGameUiCoordinator inGameUiCoordinator)
+                InGameUiCoordinator inGameUiCoordinator,
+                CombatTrainingView combatTrainingView,
+                CombatTrainingCoordinator combatTrainingCoordinator)
             {
                 Prompt = prompt;
                 DialogueController = dialogueController;
@@ -1906,6 +1957,8 @@ namespace DemonLord.Editor
                 InGameHudView = inGameHudView;
                 PauseMenuView = pauseMenuView;
                 InGameUiCoordinator = inGameUiCoordinator;
+                CombatTrainingView = combatTrainingView;
+                CombatTrainingCoordinator = combatTrainingCoordinator;
             }
 
             public InteractionPromptView Prompt { get; }
@@ -1918,6 +1971,8 @@ namespace DemonLord.Editor
             public InGameHudView InGameHudView { get; }
             public PauseMenuView PauseMenuView { get; }
             public InGameUiCoordinator InGameUiCoordinator { get; }
+            public CombatTrainingView CombatTrainingView { get; }
+            public CombatTrainingCoordinator CombatTrainingCoordinator { get; }
         }
     }
 

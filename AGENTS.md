@@ -1,6 +1,6 @@
 # DemonLord_v2 Unity 개발 규칙
 
-이 저장소를 수정하는 모든 개발 에이전트는 작업 전에 이 파일과 `docs/architecture` 문서를 읽는다. 현재 범위는 전투 구현이 아니라, 실행부터 세이브 데이터에 따른 게임 진입까지의 프런트엔드 수직 슬라이스다.
+이 저장소를 수정하는 모든 개발 에이전트는 작업 전에 이 파일과 `docs/architecture` 문서를 읽는다. 현재 범위는 실행부터 세이브 데이터에 따른 게임 진입, 쿼터뷰 탐험, 그리고 전투 대응 집행관을 통한 반복 가능한 첫 모의전투 수직 슬라이스다. 모의전투의 세부 계약은 `docs/architecture/COMBAT_TRAINING_PROTOTYPE.md`를 따른다.
 
 ## 작업 시작과 Git
 
@@ -47,6 +47,8 @@ Assets/_Project/
   Tests/EditMode/
   Tests/PlayMode/
 ```
+
+전투 규칙은 `Domain/Combat`, 반복 세션은 `Application/Combat`, 입력·UGUI·자동 재생 연출은 `Presentation/Combat`에 둔다. 전투 View가 피해·SP·확률 보너스 판정을 직접 계산하지 않는다.
 
 - `Domain`과 `Application`은 가능하면 `UnityEngine`에 의존하지 않는다.
 - UI View는 입력 전달과 렌더링만 담당한다. 파일 저장, 세이브 검증, 씬 결정은 Presenter/Coordinator/UseCase가 담당한다.

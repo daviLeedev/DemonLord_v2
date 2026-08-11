@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using DemonLord.Domain;
 using DemonLord.Presentation;
+using DemonLord.Presentation.Combat;
 using DemonLord.Presentation.Exploration;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -126,7 +127,10 @@ namespace DemonLord.Editor
             {
                 GameObject shellRoot = FindRoot(scene, "GameShellSceneRoot");
                 GameShellRoot shell = shellRoot.GetComponent<GameShellRoot>();
-                if (shell == null || shell.AreaTransitionCoordinator == null || shell.MapCoordinator == null)
+                if (shell == null
+                    || shell.AreaTransitionCoordinator == null
+                    || shell.MapCoordinator == null
+                    || shell.CombatTrainingCoordinator == null)
                 {
                     throw new InvalidOperationException(
                         "GameShell area/map references are missing. Rebuild the laboratory before the area system.");
@@ -159,6 +163,12 @@ namespace DemonLord.Editor
                     "pauseMenuView",
                     "mapCoordinator",
                     "areaTransitionCoordinator");
+                RequireObjectReferences(
+                    shell.CombatTrainingCoordinator,
+                    "dialogueController",
+                    "inputReader",
+                    "inGameUiCoordinator",
+                    "view");
             }
             finally
             {
@@ -457,9 +467,12 @@ namespace DemonLord.Editor
             DialogueFocusController dialogue = sourceRoot.GetComponentInChildren<DialogueFocusController>(true);
             NotificationView notification = sourceRoot.GetComponentInChildren<NotificationView>(true);
             InGameUiCoordinator inGameUi = sourceRoot.GetComponentInChildren<InGameUiCoordinator>(true);
+            CombatTrainingCoordinator combatTraining = sourceRoot.GetComponentInChildren<CombatTrainingCoordinator>(true);
+            CombatTrainingView combatTrainingView = sourceRoot.GetComponentInChildren<CombatTrainingView>(true);
             Canvas canvas = sourceRoot.GetComponentInChildren<Canvas>(true);
             if (player == null || cameraRig == null || camera == null || input == null || motor == null || facing == null
-                || controller == null || tracker == null || dialogue == null || notification == null || inGameUi == null || canvas == null)
+                || controller == null || tracker == null || dialogue == null || notification == null || inGameUi == null
+                || combatTraining == null || combatTrainingView == null || canvas == null)
             {
                 throw new InvalidOperationException("The GameShell source references are incomplete.");
             }
@@ -489,10 +502,12 @@ namespace DemonLord.Editor
             mapCoordinator.Configure(player, facing, tracker, mapUi.MiniMap, mapUi.AreaMap, transition);
             PauseMenuView pauseView = sourceRoot.GetComponentInChildren<PauseMenuView>(true);
             inGameUi.Configure(input, dialogue, pauseView, mapCoordinator, transition);
+            combatTraining.Configure(dialogue, input, inGameUi, combatTrainingView);
 
             SerializedObject shellSerialized = new SerializedObject(shell);
             SetObject(shellSerialized, "areaTransitionCoordinator", transition);
             SetObject(shellSerialized, "mapCoordinator", mapCoordinator);
+            SetObject(shellSerialized, "combatTrainingCoordinator", combatTraining);
             Transform environment = sourceRoot.Find("Environment");
             Transform lighting = sourceRoot.Find("Lighting");
             Transform entryPoints = sourceRoot.Find("EntryPoints");
@@ -528,7 +543,7 @@ namespace DemonLord.Editor
             SetObjectArray(shellSerialized, "legacyAreaContentRoots", legacyContent.ToArray());
             shellSerialized.ApplyModifiedPropertiesWithoutUndo();
 
-            MarkDirty(shell, transition, mapCoordinator, inGameUi, fade, mapUi.MiniMap, mapUi.AreaMap);
+            MarkDirty(shell, transition, mapCoordinator, inGameUi, combatTraining, combatTrainingView, fade, mapUi.MiniMap, mapUi.AreaMap);
         }
 
         private static ScreenFadeView BuildFade(Transform canvas)
