@@ -12,7 +12,7 @@ namespace DemonLord.Editor
         // The laboratory builder owns the source player/camera/UI hierarchy.
         // The area builder must always run after it because it binds persistent
         // shell services to those freshly-created objects.
-        private const string RunKey = "DemonLord.WorldAdjustmentLab.IntegratedAreaBuild.V4";
+        private const string RunKey = "DemonLord.WorldAdjustmentLab.IntegratedAreaBuild.V7";
         private const string PlayModeTestRunActiveKey = "DemonLord.ExplorationPlayModeTests.Active";
         private static bool integratedBuildRanThisDomain;
 
@@ -38,10 +38,15 @@ namespace DemonLord.Editor
                 return;
             }
 
-            if (SessionState.GetBool(PlayModeTestRunActiveKey, false))
+            if (SessionState.GetBool(PlayModeTestRunActiveKey, false)
+                && EditorApplication.isPlayingOrWillChangePlaymode)
             {
                 return;
             }
+
+            // A cancelled or interrupted PlayMode run can leave this session flag behind.
+            // Do not let that stale value permanently suppress interactive scene rebuilds.
+            SessionState.SetBool(PlayModeTestRunActiveKey, false);
 
             if (SessionState.GetBool(RunKey, false))
             {
@@ -79,11 +84,14 @@ namespace DemonLord.Editor
                 return;
             }
 
-            if (SessionState.GetBool(PlayModeTestRunActiveKey, false))
+            if (SessionState.GetBool(PlayModeTestRunActiveKey, false)
+                && EditorApplication.isPlayingOrWillChangePlaymode)
             {
                 SessionState.SetBool(RunKey, false);
                 return;
             }
+
+            SessionState.SetBool(PlayModeTestRunActiveKey, false);
 
             if (EditorApplication.isCompiling || EditorApplication.isPlayingOrWillChangePlaymode)
             {

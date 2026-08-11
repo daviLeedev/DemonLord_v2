@@ -33,12 +33,27 @@ namespace DemonLord.Presentation.Exploration
         private float previousTimeScale = 1f;
         private bool pauseApplied;
         private bool initialized;
+        private int externalInputBlockCount;
 
         public InGameMenuState State => stateMachine.State;
 
         public bool IsInitialized => initialized;
 
         public bool IsMapOpen => mapCoordinator != null && mapCoordinator.IsMapOpen;
+
+        public bool IsExternalInputBlocked => externalInputBlockCount > 0;
+
+        public IDisposable AcquireExternalInputBlock()
+        {
+            if (inputReader == null)
+            {
+                throw new InvalidOperationException("In-game UI input cannot be blocked before its input reader is configured.");
+            }
+
+            externalInputBlockCount++;
+            DrainExternallyBlockedInput();
+            return new ExternalInputBlockToken(this);
+        }
 
         public void Configure(
             ExplorationInputReader configuredInputReader,
@@ -116,6 +131,12 @@ namespace DemonLord.Presentation.Exploration
         {
             if (!initialized || inputReader == null)
             {
+                return;
+            }
+
+            if (externalInputBlockCount > 0)
+            {
+                DrainExternallyBlockedInput();
                 return;
             }
 
@@ -204,6 +225,30 @@ namespace DemonLord.Presentation.Exploration
             UnsubscribeView();
             CancelSettingsEditIfNeeded();
             RestoreExplorationState();
+        }
+
+        private void ReleaseExternalInputBlock()
+        {
+            if (externalInputBlockCount <= 0)
+            {
+                return;
+            }
+
+            externalInputBlockCount--;
+            DrainExternallyBlockedInput();
+        }
+
+        private void DrainExternallyBlockedInput()
+        {
+            if (inputReader == null)
+            {
+                return;
+            }
+
+            inputReader.ConsumeMapPressed();
+            inputReader.ConsumeMapFloorStep();
+            inputReader.ConsumeMapZoomDelta();
+            inputReader.ClearPendingMenuInput();
         }
 
         private void HandlePausePressed()
@@ -669,6 +714,23 @@ namespace DemonLord.Presentation.Exploration
         {
             int next = ((int)current + direction + 3) % 3;
             return (QualityPresetId)next;
+        }
+
+        private sealed class ExternalInputBlockToken : IDisposable
+        {
+            private InGameUiCoordinator owner;
+
+            public ExternalInputBlockToken(InGameUiCoordinator owner)
+            {
+                this.owner = owner;
+            }
+
+            public void Dispose()
+            {
+                InGameUiCoordinator currentOwner = owner;
+                owner = null;
+                currentOwner?.ReleaseExternalInputBlock();
+            }
         }
     }
 }

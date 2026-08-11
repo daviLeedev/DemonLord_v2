@@ -42,7 +42,14 @@ namespace DemonLord.Editor
         [InitializeOnLoadMethod]
         private static void ScheduleInitialFoundationSetup()
         {
-            EditorApplication.delayCall += EnsurePlayModeStartScene;
+            if (IsCommandLineTestRun())
+            {
+                EditorSceneManager.playModeStartScene = null;
+            }
+            else
+            {
+                EditorApplication.delayCall += EnsurePlayModeStartScene;
+            }
 
             if (SceneDefinitions.All(definition => File.Exists(definition.Path)) && HasExpectedBuildSettings())
             {
@@ -50,6 +57,12 @@ namespace DemonLord.Editor
             }
 
             EditorApplication.delayCall += EnsureFoundationScenes;
+        }
+
+        private static bool IsCommandLineTestRun()
+        {
+            return Environment.GetCommandLineArgs().Any(
+                argument => string.Equals(argument, "-runTests", StringComparison.OrdinalIgnoreCase));
         }
 
         [MenuItem("DemonLord/Bootstrap/Ensure Foundation Scenes")]

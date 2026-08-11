@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using DemonLord.Application;
 using DemonLord.Bootstrap;
 using DemonLord.Domain;
+using DemonLord.Presentation.Combat;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -28,6 +29,7 @@ namespace DemonLord.Presentation.Exploration
         [SerializeField] private AreaTransitionCoordinator areaTransitionCoordinator;
         [SerializeField] private MapCoordinator mapCoordinator;
         [SerializeField] private BattleHandoffCoordinator battleHandoffCoordinator;
+        [SerializeField] private CombatTrainingCoordinator combatTrainingCoordinator;
         [SerializeField] private GameObject[] legacyAreaContentRoots = Array.Empty<GameObject>();
         [SerializeField] private SpawnPoint[] spawnPoints = Array.Empty<SpawnPoint>();
 
@@ -56,6 +58,8 @@ namespace DemonLord.Presentation.Exploration
 
         public BattleHandoffCoordinator BattleHandoffCoordinator => battleHandoffCoordinator;
 
+        public CombatTrainingCoordinator CombatTrainingCoordinator => combatTrainingCoordinator;
+
         public AreaTransitionCoordinator AreaTransitionCoordinator => areaTransitionCoordinator;
 
         public MapCoordinator MapCoordinator => mapCoordinator;
@@ -82,7 +86,8 @@ namespace DemonLord.Presentation.Exploration
             InGameUiCoordinator configuredInGameUiCoordinator = null,
             AreaTransitionCoordinator configuredAreaTransitionCoordinator = null,
             MapCoordinator configuredMapCoordinator = null,
-            BattleHandoffCoordinator configuredBattleHandoffCoordinator = null)
+            BattleHandoffCoordinator configuredBattleHandoffCoordinator = null,
+            CombatTrainingCoordinator configuredCombatTrainingCoordinator = null)
         {
             playerRoot = configuredPlayerRoot;
             playerController = configuredPlayerController;
@@ -100,6 +105,7 @@ namespace DemonLord.Presentation.Exploration
             areaTransitionCoordinator = configuredAreaTransitionCoordinator;
             mapCoordinator = configuredMapCoordinator;
             battleHandoffCoordinator = configuredBattleHandoffCoordinator;
+            combatTrainingCoordinator = configuredCombatTrainingCoordinator;
             spawnPoints = configuredSpawnPoints == null
                 ? Array.Empty<SpawnPoint>()
                 : (SpawnPoint[])configuredSpawnPoints.Clone();
@@ -394,7 +400,8 @@ namespace DemonLord.Presentation.Exploration
             if (playerRoot == null || playerController == null || gameCamera == null
                 || inputReader == null || playerFacing == null || playerMotor == null
                 || cameraRig == null || interactionSensor == null || inGameHudView == null
-                || locationTracker == null || inGameUiCoordinator == null || mapCoordinator == null)
+                || locationTracker == null || inGameUiCoordinator == null || mapCoordinator == null
+                || battleHandoffCoordinator == null || combatTrainingCoordinator == null)
             {
                 return "game_shell_reference_missing";
             }

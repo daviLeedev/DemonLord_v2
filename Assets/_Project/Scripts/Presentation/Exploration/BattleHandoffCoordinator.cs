@@ -16,11 +16,13 @@ namespace DemonLord.Presentation.Exploration
         [SerializeField] private ExplorationInputReader inputReader;
         [SerializeField] private BattlePreparationView preparationView;
         [SerializeField] private NotificationView notificationView;
+        [SerializeField] private MonoBehaviour battleFlowServiceSource;
 
         private ExplorationLocationState locationState;
         private BattleLaunchRequest currentRequest;
         private IDisposable gateToken;
         private bool awaitingCompletedHandoff;
+        private bool dispatchInProgress;
 
         public event Action<BattleLaunchRequest> BattleRequested;
 
@@ -31,13 +33,15 @@ namespace DemonLord.Presentation.Exploration
             LabProgressController configuredProgressController,
             ExplorationInputReader configuredInputReader,
             BattlePreparationView configuredPreparationView,
-            NotificationView configuredNotificationView)
+            NotificationView configuredNotificationView,
+            MonoBehaviour configuredBattleFlowServiceSource = null)
         {
             dialogueController = configuredDialogueController;
             progressController = configuredProgressController;
             inputReader = configuredInputReader;
             preparationView = configuredPreparationView;
             notificationView = configuredNotificationView;
+            battleFlowServiceSource = configuredBattleFlowServiceSource;
         }
 
         public void BindLocationState(ExplorationLocationState configuredLocationState)
@@ -111,18 +115,50 @@ namespace DemonLord.Presentation.Exploration
             preparationView?.Show(currentRequest);
         }
 
-        private void OnDispatchRequested()
+        private async void OnDispatchRequested()
         {
-            if (currentRequest == null) return;
-            BattleRequested?.Invoke(currentRequest);
-            preparationView?.SetStatus("전투 개발 모듈의 IBattleFlowService 연결을 기다리고 있습니다.");
-            notificationView?.Show("출동 요청을 생성했습니다. 전투 모듈 연결 대기 중입니다.");
+            if (currentRequest == null || dispatchInProgress) return;
+
+            BattleLaunchRequest request = currentRequest;
+            BattleRequested?.Invoke(request);
+            if (!(battleFlowServiceSource is IBattleFlowService battleFlowService))
+            {
+                preparationView?.SetStatus("전투 모듈이 아직 연결되지 않았습니다.");
+                notificationView?.Show("전투 모듈 연결을 확인해 주세요.");
+                return;
+            }
+
+            dispatchInProgress = true;
+            preparationView?.SetStatus("모의전투를 준비하고 있습니다...");
+            try
+            {
+                BattleLaunchResult result = await battleFlowService.LaunchAsync(request);
+                if (!result.IsSuccess)
+                {
+                    preparationView?.SetStatus("출동 실패: " + result.ErrorCode);
+                    notificationView?.Show("모의전투를 시작하지 못했습니다.");
+                    return;
+                }
+
+                Close();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+                preparationView?.SetStatus("전투 모듈 실행 중 오류가 발생했습니다.");
+                notificationView?.Show("모의전투 실행 오류를 확인해 주세요.");
+            }
+            finally
+            {
+                dispatchInProgress = false;
+            }
         }
 
         public void Close()
         {
             preparationView?.Hide();
             currentRequest = null;
+            dispatchInProgress = false;
             ReleaseGate();
         }
 
