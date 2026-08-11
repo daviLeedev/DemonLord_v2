@@ -18,6 +18,14 @@ namespace DemonLord.Presentation.Combat
         private const int IntentArcCount = CombatTrainingBattle.EnemyCount * CombatTrainingBattle.UnitCount;
         private const int PlannedTargetArcCount = CombatTrainingBattle.UnitCount;
         private const int MaxTimelineNodeCount = CombatTrainingBattle.UnitCount + CombatTrainingBattle.EnemyCount;
+        // The combat group is deliberately scaled as one unit. This keeps the original
+        // uncut lineup, intent curves, labels and hit areas in the same proportions.
+        private const float CompactBattleVisualScale = 0.78f;
+        private const int ActorPresentationCount = CombatTrainingBattle.UnitCount + CombatTrainingBattle.EnemyCount;
+        private const float FocusStepDistance = 14f;
+        private const float FocusScale = 1.08f;
+        private const float ImpactFlashDuration = 0.22f;
+        private const float DefeatFadeDuration = 0.34f;
 
         private static readonly Color Primary = ColorFromHex("101720", 1f);
         private static readonly Color PrimaryLight = ColorFromHex("26384B", 1f);
@@ -41,9 +49,9 @@ namespace DemonLord.Presentation.Combat
         };
         private static readonly Vector2[] AllyLineupFootPoints =
         {
-            new Vector2(0.069f, 0.080f),
-            new Vector2(0.207f, 0.025f),
-            new Vector2(0.345f, 0.060f),
+            new Vector2(0.069f, 0.240f),
+            new Vector2(0.207f, 0.240f),
+            new Vector2(0.345f, 0.250f),
         };
         private static readonly Vector2[] EnemyLineupPoints =
         {
@@ -53,15 +61,46 @@ namespace DemonLord.Presentation.Combat
         };
         private static readonly Vector2[] EnemyLineupFootPoints =
         {
-            new Vector2(0.650f, 0.060f),
-            new Vector2(0.803f, 0.040f),
-            new Vector2(0.941f, 0.060f),
+            new Vector2(0.650f, 0.240f),
+            new Vector2(0.803f, 0.240f),
+            new Vector2(0.941f, 0.230f),
         };
         private static readonly Vector2[] EnemyLineupHitboxSizes =
         {
             new Vector2(0.160f, 0.440f),
             new Vector2(0.145f, 0.460f),
             new Vector2(0.120f, 0.450f),
+        };
+        // Dedicated transparent actor assets are used only during automatic playback.
+        // Planning keeps the original combined illustration untouched.
+        private static readonly string[] ActorSpriteResourcePaths =
+        {
+            "Combat/Actors/combat_actor_slime_001_v2",
+            "Combat/Actors/combat_actor_skeleton_guard_v2",
+            "Combat/Actors/combat_actor_goblin_archer_v2",
+            "Combat/Actors/combat_actor_trainee_swordsman_v2",
+            "Combat/Actors/combat_actor_trainee_shieldbearer_v2",
+            "Combat/Actors/combat_actor_apprentice_mage_v2",
+        };
+        private static readonly Vector2[] ActorPresentationSizes =
+        {
+            new Vector2(123f, 123f),
+            new Vector2(210f, 210f),
+            new Vector2(136f, 136f),
+            new Vector2(182f, 182f),
+            new Vector2(194f, 194f),
+            new Vector2(183f, 183f),
+        };
+        // Bottom-edge offsets are measured from the alpha bounds of the dedicated PNGs.
+        // They put visual feet on the same ground line as the labels in the original lineup.
+        private static readonly float[] ActorGroundOffsets =
+        {
+            39f,
+            82f,
+            48f,
+            68f,
+            71f,
+            72f,
         };
 
         [SerializeField] private CanvasGroup overlayGroup;
@@ -71,6 +110,11 @@ namespace DemonLord.Presentation.Combat
         [SerializeField] private Sprite backdropSprite;
         [SerializeField] private Image backdropImage;
         [SerializeField] private Image lineupImage;
+        [SerializeField] private RectTransform compactBattleVisualRoot;
+        [SerializeField] private RectTransform actorPresentationRoot;
+        [SerializeField] private Image[] actorPresentationImages = Array.Empty<Image>();
+        [SerializeField] private Image[] actorImpactOverlays = Array.Empty<Image>();
+        [SerializeField] private Text[] actorDamagePopups = Array.Empty<Text>();
         [SerializeField] private Text roundLabel;
         [SerializeField] private Text spLabel;
         [SerializeField] private GameObject compactSpMeter;
@@ -131,6 +175,16 @@ namespace DemonLord.Presentation.Combat
         private bool compactLayoutBuilt;
         private int focusedTimelineIndex = -1;
         private CombatTrainingBattle renderedBattle;
+        private readonly Vector2[] actorPresentationBasePositions = new Vector2[ActorPresentationCount];
+        private readonly Vector2[] actorPresentationBaseSizes = new Vector2[ActorPresentationCount];
+        private readonly bool[] actorPresentationAlive = new bool[ActorPresentationCount];
+        private readonly bool[] actorDefeatPending = new bool[ActorPresentationCount];
+        private readonly int[] impactActorIndices = new int[CombatTrainingBattle.UnitCount];
+        private readonly int[] impactDamageValues = new int[CombatTrainingBattle.UnitCount];
+        private int focusedActorPresentationIndex = -1;
+        private int impactActorCount;
+        private float focusStartedAt = -1f;
+        private float impactStartedAt = -1f;
 
         public event Action<int> AllyRosterRequested;
         public event Action<int> EnemyTargetRequested;
@@ -149,8 +203,14 @@ namespace DemonLord.Presentation.Combat
             // compact-layout marker before the coordinator's liaison callback renders.
             compactLayoutBuilt = HasCompactLayoutReferences();
             EnsureCompactSpMeter(null);
+            EnsureActorPresentation();
             BindButtonListeners();
             SetVisible(false);
+        }
+
+        private void Update()
+        {
+            RefreshActorPresentationAnimation();
         }
 
         private void OnEnable()
@@ -225,6 +285,7 @@ namespace DemonLord.Presentation.Combat
                 backdropImage.color = Color.white;
             }
 
+            EnsureActorPresentation();
             // This flag is runtime-only. Reconstruct it from the serialized curve references
             // whenever a regenerated scene is loaded, otherwise RenderArrows would fall back
             // to the retired straight-line layout after a domain reload.
@@ -431,18 +492,29 @@ namespace DemonLord.Presentation.Combat
 
         public void ShowPlaybackFocus(CombatTimelineEntry entry, string message)
         {
-            focusedTimelineIndex = entry.TimelineIndex;
-            if (playbackLabel != null)
-            {
-                playbackLabel.text = message ?? string.Empty;
-            }
+            BeginActionPresentation(entry, message);
+        }
 
-            ApplyPlaybackFocus();
+        public void PlayActionImpact(CombatTimelineEntry entry, CombatTimelineResolution resolution, string message)
+        {
+            TriggerImpactPresentation(entry, resolution, message);
         }
 
         public void ClearPlaybackFocus()
         {
             focusedTimelineIndex = -1;
+            focusedActorPresentationIndex = -1;
+            focusStartedAt = -1f;
+            impactStartedAt = -1f;
+            impactActorCount = 0;
+            for (int index = 0; index < actorDefeatPending.Length; index++)
+            {
+                actorDefeatPending[index] = false;
+                if (index < actorDamagePopups.Length && actorDamagePopups[index] != null)
+                {
+                    actorDamagePopups[index].gameObject.SetActive(false);
+                }
+            }
             if (playbackLabel != null)
             {
                 playbackLabel.text = string.Empty;
@@ -751,6 +823,8 @@ namespace DemonLord.Presentation.Combat
                     ? Vector3.one * 1.12f
                     : Vector3.one;
             }
+
+            RefreshActorPresentationAnimation();
         }
 
         private int FindTimelineIndexForUnit(int unitIndex)
@@ -1130,11 +1204,462 @@ namespace DemonLord.Presentation.Combat
             }
         }
 
+        private void EnsureActorPresentation()
+        {
+            EnsureCompactBattleVisualRoot();
+            if (HasActorPresentation() || compactBattleVisualRoot == null)
+            {
+                return;
+            }
+
+            if (actorPresentationRoot != null)
+            {
+                Destroy(actorPresentationRoot.gameObject);
+                actorPresentationRoot = null;
+            }
+
+            Sprite[] sprites = new Sprite[ActorPresentationCount];
+            for (int index = 0; index < ActorPresentationCount; index++)
+            {
+                Texture2D texture = Resources.Load<Texture2D>(ActorSpriteResourcePaths[index]);
+                if (texture == null)
+                {
+                    return;
+                }
+
+                sprites[index] = Sprite.Create(
+                    texture,
+                    new Rect(0f, 0f, texture.width, texture.height),
+                    new Vector2(0.5f, 0.5f),
+                    100f);
+            }
+
+            GameObject root = new GameObject("ActorPresentationLayer", typeof(RectTransform));
+            root.transform.SetParent(compactBattleVisualRoot, false);
+            actorPresentationRoot = root.GetComponent<RectTransform>();
+            SetStretch(actorPresentationRoot);
+            actorPresentationRoot.SetSiblingIndex(Mathf.Min(lineupImage.transform.GetSiblingIndex() + 1, compactBattleVisualRoot.childCount - 1));
+
+            actorPresentationImages = new Image[ActorPresentationCount];
+            actorImpactOverlays = new Image[ActorPresentationCount];
+            actorDamagePopups = new Text[ActorPresentationCount];
+            Font font = playbackLabel != null && playbackLabel.font != null
+                ? playbackLabel.font
+                : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            for (int index = 0; index < ActorPresentationCount; index++)
+            {
+                Image actor = CreateImage("ActorPresentation_" + index, actorPresentationRoot, Color.white, false);
+                actor.sprite = sprites[index];
+                actor.preserveAspect = true;
+                actor.raycastTarget = false;
+                actorPresentationImages[index] = actor;
+
+                Image impact = CreateImage("ActorImpactFlash_" + index, actor.transform, new Color(Error.r, Error.g, Error.b, 0f), false);
+                SetStretch(impact.rectTransform);
+                actorImpactOverlays[index] = impact;
+
+                Text damage = CreateText("ActorDamagePopup_" + index, actorPresentationRoot, font, 18, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(100f, 28f));
+                damage.color = Error;
+                damage.gameObject.SetActive(false);
+                actorDamagePopups[index] = damage;
+            }
+
+            actorPresentationRoot.gameObject.SetActive(false);
+        }
+
+        private void EnsureCompactBattleVisualRoot()
+        {
+            if (compactBattleVisualRoot != null)
+            {
+                compactBattleVisualRoot.localScale = Vector3.one * CompactBattleVisualScale;
+                return;
+            }
+
+            // Existing generated scenes already have the old direct-child layout. Reparent
+            // that layout at runtime too, so a code update fixes the presentation immediately
+            // without hand-editing a generated Unity scene.
+            if (!compactLayoutBuilt || lineupImage == null)
+            {
+                return;
+            }
+
+            RectTransform stage = lineupImage.transform.parent as RectTransform;
+            if (stage == null)
+            {
+                return;
+            }
+
+            GameObject root = new GameObject("CompactBattleVisualRoot", typeof(RectTransform));
+            root.transform.SetParent(stage, false);
+            compactBattleVisualRoot = root.GetComponent<RectTransform>();
+            SetCenter(compactBattleVisualRoot, new Vector2(80f, -25f), new Vector2(1320f, 760f));
+            compactBattleVisualRoot.localScale = Vector3.one * CompactBattleVisualScale;
+
+            MoveCenteredVisualToRoot(lineupImage.rectTransform);
+            MoveCenteredVisualToRoot(playbackLabel != null ? playbackLabel.rectTransform : null);
+            MoveCenteredVisualToRoot(feedbackLabel != null ? feedbackLabel.rectTransform : null);
+
+            MoveVisualArrayToRoot(allyFieldAnchors);
+            MoveVisualArrayToRoot(allyFieldGlows);
+            MoveVisualArrayToRoot(allyFieldLabels);
+            MoveVisualArrayToRoot(enemyFieldAnchors);
+            MoveVisualArrayToRoot(enemyFieldGlows);
+            MoveVisualArrayToRoot(enemyTargetButtons);
+            MoveVisualArrayToRoot(enemyFieldLabels);
+            MoveVisualArrayToRoot(enemyIntentIconLabels);
+            MoveVisualArrayToRoot(enemyIntentLabels);
+            MoveVisualArrayToRoot(enemyConditionLabels);
+
+            if (compactArrowLayer != null)
+            {
+                compactArrowLayer.SetParent(compactBattleVisualRoot, false);
+                SetStretch(compactArrowLayer);
+            }
+        }
+
+        private void MoveCenteredVisualToRoot(RectTransform visual)
+        {
+            if (visual == null || compactBattleVisualRoot == null || visual.parent == compactBattleVisualRoot)
+            {
+                return;
+            }
+
+            Vector2 localPosition = visual.anchoredPosition - compactBattleVisualRoot.anchoredPosition;
+            Vector2 size = visual.sizeDelta;
+            visual.SetParent(compactBattleVisualRoot, false);
+            SetCenter(visual, localPosition, size);
+        }
+
+        private void MoveVisualArrayToRoot(RectTransform[] visuals)
+        {
+            if (visuals == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < visuals.Length; index++)
+            {
+                MoveCenteredVisualToRoot(visuals[index]);
+            }
+        }
+
+        private void MoveVisualArrayToRoot(Image[] visuals)
+        {
+            if (visuals == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < visuals.Length; index++)
+            {
+                MoveCenteredVisualToRoot(visuals[index] != null ? visuals[index].rectTransform : null);
+            }
+        }
+
+        private void MoveVisualArrayToRoot(Text[] visuals)
+        {
+            if (visuals == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < visuals.Length; index++)
+            {
+                MoveCenteredVisualToRoot(visuals[index] != null ? visuals[index].rectTransform : null);
+            }
+        }
+
+        private void MoveVisualArrayToRoot(Button[] visuals)
+        {
+            if (visuals == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < visuals.Length; index++)
+            {
+                MoveCenteredVisualToRoot(visuals[index] != null ? visuals[index].GetComponent<RectTransform>() : null);
+            }
+        }
+
+        private bool HasActorPresentation()
+        {
+            return actorPresentationRoot != null
+                && actorPresentationImages != null
+                && actorPresentationImages.Length == ActorPresentationCount
+                && actorImpactOverlays != null
+                && actorImpactOverlays.Length == ActorPresentationCount
+                && actorDamagePopups != null
+                && actorDamagePopups.Length == ActorPresentationCount;
+        }
+
+        private void AlignActorPresentationToIllustration()
+        {
+            if (!HasActorPresentation() || lineupImage == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < ActorPresentationCount; index++)
+            {
+                bool ally = index < CombatTrainingBattle.UnitCount;
+                int actorIndex = ally ? index : index - CombatTrainingBattle.UnitCount;
+                Vector2 actor = ally
+                    ? GetLineupStagePosition(AllyLineupPoints[actorIndex])
+                    : GetLineupStagePosition(EnemyLineupPoints[actorIndex]);
+                Vector2 foot = ally
+                    ? GetLineupStagePosition(AllyLineupFootPoints[actorIndex])
+                    : GetLineupStagePosition(EnemyLineupFootPoints[actorIndex]);
+                Vector2 size = ActorPresentationSizes[index];
+                actorPresentationBaseSizes[index] = size;
+                actorPresentationBasePositions[index] = new Vector2(actor.x, foot.y + ActorGroundOffsets[index]);
+            }
+        }
+
+        private void RenderCompactActorPresentation(CombatTrainingBattle battle)
+        {
+            EnsureActorPresentation();
+            if (!HasActorPresentation())
+            {
+                if (lineupImage != null)
+                {
+                    lineupImage.color = Color.white;
+                }
+
+                return;
+            }
+
+            bool playback = battle.Phase == CombatTrainingPhase.Resolving;
+            actorPresentationRoot.gameObject.SetActive(playback);
+            if (!playback)
+            {
+                lineupImage.color = Color.white;
+                return;
+            }
+
+            // One visual set at a time: the composed lineup is for planning, and the six
+            // transparent actor assets are for playback. Do not draw both simultaneously.
+            lineupImage.color = new Color(1f, 1f, 1f, 0f);
+            AlignActorPresentationToIllustration();
+            for (int index = 0; index < ActorPresentationCount; index++)
+            {
+                bool alive = index < CombatTrainingBattle.UnitCount
+                    ? battle.IsUnitAlive((CombatTrainingUnitId)index)
+                    : battle.IsEnemyAlive((CombatTrainingEnemyId)(index - CombatTrainingBattle.UnitCount));
+                actorPresentationAlive[index] = alive;
+                actorPresentationImages[index].gameObject.SetActive(alive || actorDefeatPending[index]);
+            }
+
+            RefreshActorPresentationAnimation();
+        }
+
+        private void BeginActionPresentation(CombatTimelineEntry entry, string message)
+        {
+            focusedTimelineIndex = entry.TimelineIndex;
+            focusedActorPresentationIndex = GetActorPresentationIndex(entry);
+            focusStartedAt = Time.unscaledTime;
+            impactStartedAt = -1f;
+            impactActorCount = 0;
+            for (int index = 0; index < actorDamagePopups.Length; index++)
+            {
+                if (actorDamagePopups[index] != null)
+                {
+                    actorDamagePopups[index].gameObject.SetActive(false);
+                }
+
+                actorDefeatPending[index] = false;
+            }
+
+            if (playbackLabel != null)
+            {
+                playbackLabel.text = message ?? string.Empty;
+            }
+
+            ApplyPlaybackFocus();
+        }
+
+        private void TriggerImpactPresentation(CombatTimelineEntry entry, CombatTimelineResolution resolution, string message)
+        {
+            if (focusedTimelineIndex != entry.TimelineIndex)
+            {
+                BeginActionPresentation(entry, message);
+            }
+            else if (playbackLabel != null)
+            {
+                playbackLabel.text = message ?? string.Empty;
+            }
+
+            impactStartedAt = Time.unscaledTime;
+            impactActorCount = 0;
+            if (!resolution.Skipped)
+            {
+                if (resolution.Side == CombatTimelineSide.Ally)
+                {
+                    AddImpactActor(CombatTrainingBattle.UnitCount + (int)resolution.TargetEnemyId, resolution.TotalDamage);
+                }
+                else
+                {
+                    for (int unitIndex = 0; unitIndex < CombatTrainingBattle.UnitCount; unitIndex++)
+                    {
+                        int damage = resolution.GetIncomingDamage((CombatTrainingUnitId)unitIndex);
+                        if (damage > 0)
+                        {
+                            AddImpactActor(unitIndex, damage);
+                        }
+                    }
+                }
+            }
+
+            ApplyPlaybackFocus();
+        }
+
+        private void AddImpactActor(int actorIndex, int damage)
+        {
+            if (actorIndex < 0 || actorIndex >= ActorPresentationCount || impactActorCount >= impactActorIndices.Length)
+            {
+                return;
+            }
+
+            impactActorIndices[impactActorCount] = actorIndex;
+            impactDamageValues[impactActorCount] = damage;
+            impactActorCount++;
+            actorDefeatPending[actorIndex] = !actorPresentationAlive[actorIndex];
+            if (HasActorPresentation())
+            {
+                actorPresentationImages[actorIndex].gameObject.SetActive(true);
+                Text popup = actorDamagePopups[actorIndex];
+                popup.text = "-" + damage;
+                popup.color = Error;
+                popup.gameObject.SetActive(damage > 0);
+            }
+        }
+
+        private void RefreshActorPresentationAnimation()
+        {
+            if (!HasActorPresentation())
+            {
+                return;
+            }
+
+            float now = Time.unscaledTime;
+            float impactAge = impactStartedAt < 0f ? float.PositiveInfinity : now - impactStartedAt;
+            bool focusActive = focusedActorPresentationIndex >= 0 && focusStartedAt >= 0f;
+            for (int index = 0; index < ActorPresentationCount; index++)
+            {
+                Image actor = actorPresentationImages[index];
+                if (actor == null)
+                {
+                    continue;
+                }
+
+                bool hit = TryGetImpactActor(index, out int damage);
+                bool defeatFading = actorDefeatPending[index] && hit && impactAge < DefeatFadeDuration;
+                bool visible = actorPresentationAlive[index] || defeatFading;
+                bool focused = focusActive && index == focusedActorPresentationIndex;
+                if (!visible)
+                {
+                    actor.gameObject.SetActive(false);
+                    if (actorDamagePopups[index] != null)
+                    {
+                        actorDamagePopups[index].gameObject.SetActive(false);
+                    }
+
+                    continue;
+                }
+
+                actor.gameObject.SetActive(true);
+                float step = focused ? Mathf.Clamp01((now - focusStartedAt) / 0.14f) : 0f;
+                if (focused && impactStartedAt >= focusStartedAt)
+                {
+                    step *= 1f - Mathf.Clamp01(impactAge / 0.30f);
+                }
+
+                Vector2 direction = index < CombatTrainingBattle.UnitCount ? Vector2.right : Vector2.left;
+                Vector2 shake = hit && impactAge < ImpactFlashDuration
+                    ? Vector2.right * Mathf.Sin(impactAge * 95f) * 5f * (1f - impactAge / ImpactFlashDuration)
+                    : Vector2.zero;
+                actor.rectTransform.anchoredPosition = actorPresentationBasePositions[index] + direction * (FocusStepDistance * step) + shake;
+                actor.rectTransform.sizeDelta = actorPresentationBaseSizes[index];
+                actor.rectTransform.localScale = Vector3.one * (focused ? FocusScale : 1f);
+
+                Color color = focused
+                    ? Color.white
+                    : focusActive
+                        ? new Color(0.34f, 0.40f, 0.50f, 0.58f)
+                        : Color.white;
+                if (hit && impactAge < ImpactFlashDuration)
+                {
+                    color = Color.Lerp(new Color(1f, 0.24f, 0.24f, 1f), color, impactAge / ImpactFlashDuration);
+                }
+
+                if (defeatFading)
+                {
+                    color.a = 1f - Mathf.Clamp01(impactAge / DefeatFadeDuration);
+                }
+
+                actor.color = color;
+                Image flash = actorImpactOverlays[index];
+                flash.color = hit && impactAge < ImpactFlashDuration
+                    ? new Color(1f, 0.16f, 0.16f, 0.48f * (1f - impactAge / ImpactFlashDuration))
+                    : new Color(Error.r, Error.g, Error.b, 0f);
+
+                Text popup = actorDamagePopups[index];
+                if (popup != null)
+                {
+                    bool popupVisible = hit && damage > 0 && impactAge < 0.56f;
+                    popup.gameObject.SetActive(popupVisible);
+                    if (popupVisible)
+                    {
+                        float rise = Mathf.Clamp01(impactAge / 0.56f) * 34f;
+                        SetCenter(popup.rectTransform, actorPresentationBasePositions[index] + new Vector2(0f, actorPresentationBaseSizes[index].y * 0.58f + rise), new Vector2(100f, 28f));
+                        Color popupColor = Error;
+                        popupColor.a = 1f - Mathf.Clamp01(impactAge / 0.56f);
+                        popup.color = popupColor;
+                    }
+                }
+            }
+        }
+
+        private bool TryGetImpactActor(int actorIndex, out int damage)
+        {
+            for (int index = 0; index < impactActorCount; index++)
+            {
+                if (impactActorIndices[index] == actorIndex)
+                {
+                    damage = impactDamageValues[index];
+                    return true;
+                }
+            }
+
+            damage = 0;
+            return false;
+        }
+
+        private static int GetActorPresentationIndex(CombatTimelineEntry entry)
+        {
+            if (entry.Side == CombatTimelineSide.Enemy)
+            {
+                return CombatTrainingBattle.UnitCount + (int)entry.EnemyId;
+            }
+
+            return entry.HasAllyAction
+                ? (int)CombatTrainingBattle.GetSkillDefinition(entry.AllyAction.SkillId).ActorId
+                : -1;
+        }
+
         private void BuildCompactBattlefield(Font font)
         {
             GameObject stage = new GameObject("BattleStage", typeof(RectTransform));
             stage.transform.SetParent(backgroundRoot.transform, false);
             SetStretch(stage.GetComponent<RectTransform>());
+
+            // This is a single visual coordinate space: original lineup + hit targets +
+            // intent curves + names. Scaling this root keeps every element aligned.
+            GameObject visualRoot = new GameObject("CompactBattleVisualRoot", typeof(RectTransform));
+            visualRoot.transform.SetParent(stage.transform, false);
+            compactBattleVisualRoot = visualRoot.GetComponent<RectTransform>();
+            SetCenter(compactBattleVisualRoot, new Vector2(80f, -25f), new Vector2(1320f, 760f));
+            compactBattleVisualRoot.localScale = Vector3.one * CompactBattleVisualScale;
 
             Text allyLabel = CreateText("AllyFieldLabel", stage.transform, font, 15, TextAnchor.MiddleLeft, Vector2.zero, new Vector2(180f, 24f));
             SetTopLeft(allyLabel.rectTransform, new Vector2(24f, -108f), new Vector2(180f, 24f));
@@ -1147,26 +1672,26 @@ namespace DemonLord.Presentation.Combat
             Image rule = CreateImage("BattlefieldRule", stage.transform, new Color(Gold.r, Gold.g, Gold.b, 0.35f), false);
             SetHorizontalStretch(rule.rectTransform, 24f, 24f, 920f, 1f);
 
-            lineupImage = CreateImage("CombatIllustrationLineup", stage.transform, Color.white, false);
-            // The scene fills the screen, not the actors. Keep the combatants compact so
-            // the floor, depth, status labels and intent curves remain readable.
-            SetCenter(lineupImage.rectTransform, new Vector2(80f, -25f), new Vector2(820f, 328f));
+            lineupImage = CreateImage("CombatIllustrationLineup", compactBattleVisualRoot, Color.white, false);
+            // Preserve the full source illustration. The visual root above scales it together
+            // with every battle annotation instead of cropping only the characters.
+            SetCenter(lineupImage.rectTransform, Vector2.zero, new Vector2(820f, 328f));
             lineupImage.sprite = lineupSprite;
             lineupImage.preserveAspect = true;
             if (lineupSprite == null)
             {
                 lineupImage.color = new Color(0f, 0f, 0f, 0f);
-                Text fallback = CreateText("IllustrationFallback", stage.transform, font, 20, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(650f, 32f));
-                SetCenter(fallback.rectTransform, new Vector2(80f, -25f), new Vector2(650f, 32f));
+                Text fallback = CreateText("IllustrationFallback", compactBattleVisualRoot, font, 20, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(650f, 32f));
+                SetCenter(fallback.rectTransform, Vector2.zero, new Vector2(650f, 32f));
                 fallback.text = "전투 일러스트 준비 중";
                 fallback.color = MutedText;
             }
 
-            playbackLabel = CreateText("Playback", stage.transform, font, 18, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(640f, 28f));
-            SetCenter(playbackLabel.rectTransform, new Vector2(80f, 340f), new Vector2(640f, 28f));
+            playbackLabel = CreateText("Playback", compactBattleVisualRoot, font, 18, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(640f, 28f));
+            SetCenter(playbackLabel.rectTransform, new Vector2(0f, 365f), new Vector2(640f, 28f));
             playbackLabel.color = Gold;
-            feedbackLabel = CreateText("Feedback", stage.transform, font, 14, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(820f, 26f));
-            SetCenter(feedbackLabel.rectTransform, new Vector2(80f, 306f), new Vector2(820f, 26f));
+            feedbackLabel = CreateText("Feedback", compactBattleVisualRoot, font, 14, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(820f, 26f));
+            SetCenter(feedbackLabel.rectTransform, new Vector2(0f, 331f), new Vector2(820f, 26f));
             feedbackLabel.color = MainText;
 
             allyFieldGlows = new Image[CombatTrainingBattle.UnitCount];
@@ -1180,12 +1705,12 @@ namespace DemonLord.Presentation.Combat
             };
             for (int index = 0; index < CombatTrainingBattle.UnitCount; index++)
             {
-                RectTransform anchor = CreateAnchor("AllyAnchor_" + index, stage.transform, new Vector2(0.5f, 0.5f), allyPositions[index]);
+                RectTransform anchor = CreateAnchor("AllyAnchor_" + index, compactBattleVisualRoot, new Vector2(0.5f, 0.5f), allyPositions[index]);
                 allyFieldAnchors[index] = anchor;
-                Image underline = CreateImage("AllyFieldGlow_" + index, stage.transform, new Color(Secondary.r, Secondary.g, Secondary.b, 0.72f), false);
+                Image underline = CreateImage("AllyFieldGlow_" + index, compactBattleVisualRoot, new Color(Secondary.r, Secondary.g, Secondary.b, 0.72f), false);
                 SetCenter(underline.rectTransform, allyPositions[index] + new Vector2(0f, -145f), new Vector2(76f, 4f));
                 allyFieldGlows[index] = underline;
-                allyFieldLabels[index] = CreateText("AllyFieldLabel_" + index, stage.transform, font, 13, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(148f, 42f));
+                allyFieldLabels[index] = CreateText("AllyFieldLabel_" + index, compactBattleVisualRoot, font, 13, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(148f, 42f));
                 SetCenter(allyFieldLabels[index].rectTransform, allyPositions[index] + new Vector2(0f, -170f), new Vector2(148f, 42f));
             }
 
@@ -1204,32 +1729,33 @@ namespace DemonLord.Presentation.Combat
             };
             for (int index = 0; index < CombatTrainingBattle.EnemyCount; index++)
             {
-                RectTransform anchor = CreateAnchor("EnemyAnchor_" + index, stage.transform, new Vector2(0.5f, 0.5f), enemyPositions[index]);
+                RectTransform anchor = CreateAnchor("EnemyAnchor_" + index, compactBattleVisualRoot, new Vector2(0.5f, 0.5f), enemyPositions[index]);
                 enemyFieldAnchors[index] = anchor;
-                Image underline = CreateImage("EnemyFieldGlow_" + index, stage.transform, new Color(Error.r, Error.g, Error.b, 0.76f), false);
+                Image underline = CreateImage("EnemyFieldGlow_" + index, compactBattleVisualRoot, new Color(Error.r, Error.g, Error.b, 0.76f), false);
                 SetCenter(underline.rectTransform, enemyPositions[index] + new Vector2(0f, -145f), new Vector2(76f, 4f));
                 enemyFieldGlows[index] = underline;
-                enemyTargetButtons[index] = CreateTransparentButton("EnemyTarget_" + index, stage.transform, Vector2.zero, new Vector2(88f, 188f));
+                enemyTargetButtons[index] = CreateTransparentButton("EnemyTarget_" + index, compactBattleVisualRoot, Vector2.zero, new Vector2(88f, 188f));
                 SetCenter(enemyTargetButtons[index].GetComponent<RectTransform>(), enemyPositions[index], new Vector2(88f, 188f));
-                enemyFieldLabels[index] = CreateText("EnemyFieldLabel_" + index, stage.transform, font, 13, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(148f, 42f));
+                enemyFieldLabels[index] = CreateText("EnemyFieldLabel_" + index, compactBattleVisualRoot, font, 13, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(148f, 42f));
                 SetCenter(enemyFieldLabels[index].rectTransform, enemyPositions[index] + new Vector2(0f, -170f), new Vector2(148f, 42f));
-                enemyIntentIconLabels[index] = CreateText("EnemyIntentIcon_" + index, stage.transform, font, 20, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(28f, 24f));
+                enemyIntentIconLabels[index] = CreateText("EnemyIntentIcon_" + index, compactBattleVisualRoot, font, 20, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(28f, 24f));
                 SetCenter(enemyIntentIconLabels[index].rectTransform, enemyPositions[index] + new Vector2(0f, 144f), new Vector2(28f, 24f));
-                enemyIntentLabels[index] = CreateText("EnemyIntent_" + index, stage.transform, font, 12, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(166f, 28f));
+                enemyIntentLabels[index] = CreateText("EnemyIntent_" + index, compactBattleVisualRoot, font, 12, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(166f, 28f));
                 SetCenter(enemyIntentLabels[index].rectTransform, enemyPositions[index] + new Vector2(0f, 170f), new Vector2(166f, 28f));
-                enemyConditionLabels[index] = CreateText("EnemyConditions_" + index, stage.transform, font, 11, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(148f, 20f));
+                enemyConditionLabels[index] = CreateText("EnemyConditions_" + index, compactBattleVisualRoot, font, 11, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(148f, 20f));
                 SetCenter(enemyConditionLabels[index].rectTransform, enemyPositions[index] + new Vector2(0f, -196f), new Vector2(148f, 20f));
                 enemyConditionLabels[index].color = Gold;
             }
 
             GameObject arrowLayer = new GameObject("IntentArrowLayer", typeof(RectTransform));
-            arrowLayer.transform.SetParent(stage.transform, false);
+            arrowLayer.transform.SetParent(compactBattleVisualRoot, false);
             compactArrowLayer = arrowLayer.GetComponent<RectTransform>();
             SetStretch(compactArrowLayer);
             CreateCompactArrowLayer(compactArrowLayer);
             // The arrows intentionally sit over the transparent character lineup. All arrow
             // graphics ignore raycasts, so enemy selection remains available underneath.
             arrowLayer.transform.SetAsLastSibling();
+            EnsureActorPresentation();
         }
 
         private void BuildCompactSkillPanel(Font font)
@@ -1562,6 +2088,8 @@ namespace DemonLord.Presentation.Combat
                 enemyIntentLabels[index].color = alive && !cancelled ? Error : MutedText;
                 enemyConditionLabels[index].text = Shorten(ConditionSummary(battle.GetEnemyConditions(enemyId)), 16);
             }
+
+            RenderCompactActorPresentation(battle);
         }
 
         private void RenderCompactSkillSet(

@@ -272,7 +272,7 @@ namespace DemonLord.Presentation.Combat
                     EnsureSelectedTargetIsAlive();
                     string feedback = ActionLinePrefix(entry) + FormatTimelineResolution(entry, resolution);
                     Render(feedback);
-                    view.ShowPlaybackFocus(entry, feedback);
+                    view.PlayActionImpact(entry, resolution, feedback);
                     yield return WaitUnscaled(ActionResultSeconds);
                 }
 
