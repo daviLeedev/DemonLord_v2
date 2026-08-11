@@ -85,15 +85,21 @@ namespace DemonLord.Tests.PlayMode
             Assert.That(preparation, Is.Not.Null);
             Assert.That(preparation.IsVisible, Is.True);
             Assert.That(root.BattleHandoffCoordinator.CurrentRequest, Is.Not.Null);
-            Assert.That(combat.IsTrainingActive, Is.False, "Completing dialogue must stop at the dispatch confirmation.");
-
+            Assert.That(combat.IsTrainingActive, Is.False, "Completing dialogue must wait for the player's start decision.");
             Button dispatch = preparation.GetComponentsInChildren<Button>(true)
-                .First(button => string.Equals(button.name, "DispatchButton", StringComparison.Ordinal));
+                .Single(button => string.Equals(button.name, "DispatchButton", StringComparison.Ordinal));
+            Button close = preparation.GetComponentsInChildren<Button>(true)
+                .Single(button => string.Equals(button.name, "CloseButton", StringComparison.Ordinal));
+            Assert.That(dispatch, Is.Not.Null);
+            Assert.That(close, Is.Not.Null);
+            Assert.That(dispatch.GetComponentInChildren<Text>(true).text, Is.EqualTo("시작"));
+            Assert.That(close.GetComponentInChildren<Text>(true).text, Is.EqualTo("그만두기"));
+
             dispatch.onClick.Invoke();
 
             Assert.That(combat.IsTrainingActive, Is.True);
             Assert.That(combat.View.IsVisible, Is.True);
-            Assert.That(preparation.IsVisible, Is.False);
+            Assert.That(root.BattleHandoffCoordinator.CurrentRequest, Is.Null);
             Assert.That(combat.Session.Battle.Phase, Is.EqualTo(CombatTrainingPhase.Planning));
             Assert.That(combat.SelectedUnit, Is.EqualTo(CombatTrainingUnitId.Slime001));
             Assert.That(combat.SelectedTarget, Is.EqualTo(CombatTrainingEnemyId.TraineeSwordsman));
@@ -105,6 +111,14 @@ namespace DemonLord.Tests.PlayMode
             Assert.That(backdrop.sprite, Is.Not.Null);
             Assert.That(FindChild(combat.View, "CombatBackdropShade").GetComponent<Image>(), Is.Not.Null);
             AssertResponsiveCombatOverlayLayout(combat.View);
+            Assert.That(FindChild(combat.View, "SharedSp").activeInHierarchy, Is.False,
+                "Shared SP must not compete with the round header.");
+            Assert.That(FindChild(combat.View, "SharedSpMeter"), Is.Not.Null);
+            Assert.That(FindChild(combat.View, "SharedSpValue").GetComponent<Text>().text, Is.EqualTo("SP 4 / 8"));
+            for (int index = 0; index < CombatTrainingBattle.MaximumSp; index++)
+            {
+                Assert.That(FindChild(combat.View, "SharedSpStar_" + index).GetComponent<Text>(), Is.Not.Null);
+            }
 
             Assert.That(root.InputReader.Gate.IsBlocked(ExplorationInputChannel.Movement), Is.True);
             Assert.That(root.InputReader.Gate.IsBlocked(ExplorationInputChannel.Dash), Is.True);
@@ -139,6 +153,10 @@ namespace DemonLord.Tests.PlayMode
             ClickButton(combat.View, "SkillOption_0");
             AssertActiveVisual(combat.View, "PlannedTargetArc_0_0");
             AssertActiveVisual(combat.View, "PlannedTargetArc_0_Head");
+            Assert.That(FindChild(combat.View, "SharedSpValue").GetComponent<Text>().text, Is.EqualTo("SP 5 / 8"));
+            Text recoveredStar = FindChild(combat.View, "SharedSpStar_4").GetComponent<Text>();
+            Assert.That(recoveredStar.color.g, Is.GreaterThan(recoveredStar.color.r),
+                "A planned SP recovery must light the newly recovered star in green.");
             ClickButton(combat.View, "AllyRoster_1");
             AssertActiveVisual(combat.View, "PlannedTargetArc_0_0");
             ClickButton(combat.View, "AllyRoster_0");

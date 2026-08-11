@@ -83,10 +83,7 @@ namespace DemonLord.Presentation.Exploration
             }
 
             awaitingCompletedHandoff = true;
-            if (progressController != null && progressController.IsCombatHandoffComplete)
-            {
-                ShowPreparation();
-            }
+            ShowPreparation();
         }
 
         private void OnObjectiveChanged(LabObjectiveState state)
@@ -96,7 +93,19 @@ namespace DemonLord.Presentation.Exploration
 
         private void ShowPreparation()
         {
+            if (dispatchInProgress) return;
+
             awaitingCompletedHandoff = false;
+            if (!TryCreateLaunchRequest(out BattleLaunchRequest request)) return;
+
+            currentRequest = request;
+            gateToken ??= inputReader?.Gate.AcquireLock(ExplorationInputChannel.All);
+            inputReader?.ClearPendingMenuInput();
+            preparationView?.Show(request);
+        }
+
+        private bool TryCreateLaunchRequest(out BattleLaunchRequest request)
+        {
             ExplorationLocation returnLocation = locationState?.Current;
             if (returnLocation == null
                 && !ExplorationLocation.TryCreate(
@@ -106,20 +115,24 @@ namespace DemonLord.Presentation.Exploration
                     out _))
             {
                 notificationView?.Show("전투 복귀 위치를 만들 수 없습니다.");
-                return;
+                request = null;
+                return false;
             }
 
-            currentRequest = new BattleLaunchRequest(BattleId, EnemyGroupId, returnLocation);
-            gateToken ??= inputReader?.Gate.AcquireLock(ExplorationInputChannel.All);
-            inputReader?.ClearPendingMenuInput();
-            preparationView?.Show(currentRequest);
+            request = new BattleLaunchRequest(BattleId, EnemyGroupId, returnLocation);
+            return true;
         }
 
-        private async void OnDispatchRequested()
+        private void OnDispatchRequested()
         {
             if (currentRequest == null || dispatchInProgress) return;
+            BeginLaunch(currentRequest);
+        }
 
-            BattleLaunchRequest request = currentRequest;
+        private async void BeginLaunch(BattleLaunchRequest request)
+        {
+            if (request == null || dispatchInProgress) return;
+
             BattleRequested?.Invoke(request);
             if (!(battleFlowServiceSource is IBattleFlowService battleFlowService))
             {

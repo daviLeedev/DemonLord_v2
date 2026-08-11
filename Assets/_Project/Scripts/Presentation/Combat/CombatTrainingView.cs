@@ -30,6 +30,39 @@ namespace DemonLord.Presentation.Combat
         private static readonly Color Danger = ColorFromHex("7D1827", 1f);
         private static readonly Color Error = ColorFromHex("D04A50", 1f);
         private static readonly Color SelectedGreen = ColorFromHex("77D98A", 1f);
+        // Normalized actor points inside combat_training_lineup_v1. Keeping these relative
+        // to the source illustration means the arrows and enemy hit targets scale with the
+        // artwork rather than with an unrelated fixed battlefield coordinate.
+        private static readonly Vector2[] AllyLineupPoints =
+        {
+            new Vector2(0.069f, 0.372f),
+            new Vector2(0.207f, 0.509f),
+            new Vector2(0.345f, 0.432f),
+        };
+        private static readonly Vector2[] AllyLineupFootPoints =
+        {
+            new Vector2(0.069f, 0.080f),
+            new Vector2(0.207f, 0.025f),
+            new Vector2(0.345f, 0.060f),
+        };
+        private static readonly Vector2[] EnemyLineupPoints =
+        {
+            new Vector2(0.650f, 0.454f),
+            new Vector2(0.803f, 0.476f),
+            new Vector2(0.941f, 0.476f),
+        };
+        private static readonly Vector2[] EnemyLineupFootPoints =
+        {
+            new Vector2(0.650f, 0.060f),
+            new Vector2(0.803f, 0.040f),
+            new Vector2(0.941f, 0.060f),
+        };
+        private static readonly Vector2[] EnemyLineupHitboxSizes =
+        {
+            new Vector2(0.160f, 0.440f),
+            new Vector2(0.145f, 0.460f),
+            new Vector2(0.120f, 0.450f),
+        };
 
         [SerializeField] private CanvasGroup overlayGroup;
         [SerializeField] private EventSystem eventSystem;
@@ -40,6 +73,10 @@ namespace DemonLord.Presentation.Combat
         [SerializeField] private Image lineupImage;
         [SerializeField] private Text roundLabel;
         [SerializeField] private Text spLabel;
+        [SerializeField] private GameObject compactSpMeter;
+        [SerializeField] private Text compactSpValueLabel;
+        [SerializeField] private Text compactSpDeltaLabel;
+        [SerializeField] private Text[] compactSpStarLabels = Array.Empty<Text>();
         [SerializeField] private Text phaseLabel;
         [SerializeField] private Text instructionLabel;
         [SerializeField] private Text feedbackLabel;
@@ -111,6 +148,7 @@ namespace DemonLord.Presentation.Combat
             // The scene can enter play without a second Configure call. Restore the
             // compact-layout marker before the coordinator's liaison callback renders.
             compactLayoutBuilt = HasCompactLayoutReferences();
+            EnsureCompactSpMeter(null);
             BindButtonListeners();
             SetVisible(false);
         }
@@ -191,6 +229,7 @@ namespace DemonLord.Presentation.Combat
             // whenever a regenerated scene is loaded, otherwise RenderArrows would fall back
             // to the retired straight-line layout after a domain reload.
             compactLayoutBuilt = compactLayoutBuilt || HasCompactLayoutReferences();
+            EnsureCompactSpMeter(font);
             BindButtonListeners();
             SetVisible(false);
         }
@@ -370,6 +409,7 @@ namespace DemonLord.Presentation.Combat
             resultPanel.SetActive(finished);
 
             RenderRoster(battle, selectedUnit, planning);
+            RenderCompactSpMeter(battle);
             RenderBattlefield(battle, selectedUnit, selectedTarget, planning);
             RenderSkillSet(battle, selectedUnit, selectedTarget, planning);
             RenderTimeline(battle, planning);
@@ -620,6 +660,7 @@ namespace DemonLord.Presentation.Combat
                         + "\n" + intent.DisplayName + " → " + target + cancelled;
                     timelineSlotLabels[timelineIndex].color = entry.IsCancelled && entry.WasResolved ? MutedText : MainText;
                 }
+
             }
 
             executeButton.interactable = battle.CanExecutePlan;
@@ -925,6 +966,7 @@ namespace DemonLord.Presentation.Combat
             instructionLabel.gameObject.SetActive(false);
 
             BuildCompactRoster(font);
+            BuildCompactSpMeter(font);
             BuildCompactBattlefield(font);
             BuildCompactSkillPanel(font);
             BuildCompactTimeline(font);
@@ -962,6 +1004,129 @@ namespace DemonLord.Presentation.Combat
                 portraitMark.color = index == 0 ? Secondary : Gold;
                 allyRosterLabels[index] = CreateText("Label", button.transform, font, 13, TextAnchor.MiddleLeft, new Vector2(116f, 38f), new Vector2(116f, 24f));
                 allyRosterOrderLabels[index] = CreateText("Order", button.transform, font, 11, TextAnchor.MiddleLeft, new Vector2(116f, 14f), new Vector2(116f, 16f));
+            }
+        }
+
+        private void EnsureCompactSpMeter(Font font)
+        {
+            if (spLabel != null)
+            {
+                // The header is reserved for round and action-line status. Shared SP is the
+                // party's common budget, so it is shown immediately below the party roster.
+                spLabel.gameObject.SetActive(false);
+            }
+
+            if (compactSpMeter != null
+                && compactSpValueLabel != null
+                && compactSpDeltaLabel != null
+                && compactSpStarLabels != null
+                && compactSpStarLabels.Length == CombatTrainingBattle.MaximumSp)
+            {
+                return;
+            }
+
+            if (backgroundRoot == null)
+            {
+                return;
+            }
+
+            BuildCompactSpMeter(font != null ? font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"));
+        }
+
+        private void BuildCompactSpMeter(Font font)
+        {
+            if (compactSpMeter != null)
+            {
+                return;
+            }
+
+            Image meter = CreateImage("SharedSpMeter", backgroundRoot.transform, new Color(Surface.r, Surface.g, Surface.b, 0.84f), false);
+            SetMiddleLeft(meter.rectTransform, new Vector2(24f, -252f), new Vector2(190f, 82f));
+            compactSpMeter = meter.gameObject;
+
+            Text title = CreateText("SharedSpTitle", meter.transform, font, 13, TextAnchor.MiddleLeft, Vector2.zero, new Vector2(170f, 18f));
+            SetTopLeft(title.rectTransform, new Vector2(10f, -7f), new Vector2(170f, 18f));
+            title.text = "공유 SP";
+            title.color = Secondary;
+
+            compactSpValueLabel = CreateText("SharedSpValue", meter.transform, font, 12, TextAnchor.MiddleRight, Vector2.zero, new Vector2(72f, 18f));
+            SetTopRight(compactSpValueLabel.rectTransform, new Vector2(-8f, -7f), new Vector2(72f, 18f));
+            compactSpValueLabel.color = MainText;
+
+            compactSpStarLabels = new Text[CombatTrainingBattle.MaximumSp];
+            for (int index = 0; index < compactSpStarLabels.Length; index++)
+            {
+                Text star = CreateText("SharedSpStar_" + index, meter.transform, font, 23, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(19f, 27f));
+                SetTopLeft(star.rectTransform, new Vector2(8f + index * 22f, -25f), new Vector2(19f, 27f));
+                star.text = "★";
+                star.fontStyle = FontStyle.Bold;
+                compactSpStarLabels[index] = star;
+            }
+
+            compactSpDeltaLabel = CreateText("SharedSpDelta", meter.transform, font, 10, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(174f, 14f));
+            SetBottomCenter(compactSpDeltaLabel.rectTransform, new Vector2(0f, 5f), new Vector2(174f, 14f));
+            compactSpDeltaLabel.color = MutedText;
+        }
+
+        private void RenderCompactSpMeter(CombatTrainingBattle battle)
+        {
+            if (!compactLayoutBuilt || compactSpMeter == null || compactSpValueLabel == null || compactSpDeltaLabel == null)
+            {
+                return;
+            }
+
+            int projectedSp = battle.SharedSp;
+            int plannedCost = 0;
+            int plannedGain = 0;
+            bool hasPlannedSkill = false;
+            bool hasUnaffordableSkill = false;
+
+            // The action line is already speed-sorted. This shows the same SP sequence that
+            // the player will see when automatic playback begins.
+            for (int timelineIndex = 0; timelineIndex < battle.TimelineEntryCount; timelineIndex++)
+            {
+                CombatTimelineEntry entry = battle.GetTimelineEntry(timelineIndex);
+                if (entry.Side != CombatTimelineSide.Ally || !entry.HasAllyAction || entry.IsCancelled)
+                {
+                    continue;
+                }
+
+                CombatTrainingSkillDefinition skill = CombatTrainingBattle.GetSkillDefinition(entry.AllyAction.SkillId);
+                hasPlannedSkill = true;
+                if (projectedSp < skill.SpCost)
+                {
+                    hasUnaffordableSkill = true;
+                    continue;
+                }
+
+                plannedCost += skill.SpCost;
+                int afterCost = projectedSp - skill.SpCost;
+                int actualGain = Mathf.Min(CombatTrainingBattle.MaximumSp, afterCost + skill.SpGain) - afterCost;
+                plannedGain += actualGain;
+                projectedSp = afterCost + actualGain;
+            }
+
+            compactSpValueLabel.text = "SP " + projectedSp + " / " + CombatTrainingBattle.MaximumSp;
+            compactSpDeltaLabel.text = hasUnaffordableSkill
+                ? "계획 SP 부족"
+                : hasPlannedSkill
+                    ? "계획  사용 -" + plannedCost + " · 회복 +" + plannedGain
+                    : "기술을 고르면 예상 SP를 표시";
+            compactSpDeltaLabel.color = hasUnaffordableSkill ? Error : hasPlannedSkill ? MainText : MutedText;
+
+            for (int index = 0; index < compactSpStarLabels.Length; index++)
+            {
+                Text star = compactSpStarLabels[index];
+                if (star == null)
+                {
+                    continue;
+                }
+
+                bool filledAfterPlan = index < projectedSp;
+                bool newlyRecovered = filledAfterPlan && index >= battle.SharedSp;
+                star.color = filledAfterPlan
+                    ? newlyRecovered ? SelectedGreen : Gold
+                    : new Color(MutedText.r, MutedText.g, MutedText.b, 0.28f);
             }
         }
 
@@ -1352,6 +1517,8 @@ namespace DemonLord.Presentation.Combat
             CombatTrainingEnemyId selectedTarget,
             bool planning)
         {
+            AlignCompactBattlefieldToIllustration();
+
             for (int index = 0; index < CombatTrainingBattle.UnitCount; index++)
             {
                 CombatTrainingUnitId unitId = (CombatTrainingUnitId)index;
@@ -1431,27 +1598,29 @@ namespace DemonLord.Presentation.Combat
 
         private void RenderCompactTimeline(CombatTrainingBattle battle, bool planning)
         {
-            int visibleEntryCount = Mathf.Min(battle.TimelineEntryCount, timelineSlotBackgrounds.Length);
-            for (int timelineIndex = 0; timelineIndex < timelineSlotBackgrounds.Length; timelineIndex++)
+            for (int index = 0; index < timelineSlotBackgrounds.Length; index++)
             {
-                bool visible = timelineIndex < visibleEntryCount;
-                timelineSlotBackgrounds[timelineIndex].gameObject.SetActive(visible);
-                if (!visible)
+                timelineSlotBackgrounds[index].gameObject.SetActive(false);
+            }
+
+            int displayIndex = 0;
+            for (int timelineIndex = 0; timelineIndex < battle.TimelineEntryCount && displayIndex < timelineSlotBackgrounds.Length; timelineIndex++)
+            {
+
+                CombatTimelineEntry entry = battle.GetTimelineEntry(timelineIndex);
+                if (!ShouldDisplayTimelineEntry(battle, entry))
                 {
                     continue;
                 }
 
-                CombatTimelineEntry entry = battle.GetTimelineEntry(timelineIndex);
+                int slotIndex = displayIndex++;
+                timelineSlotBackgrounds[slotIndex].gameObject.SetActive(true);
                 bool ally = entry.Side == CombatTimelineSide.Ally;
                 Color normal = ally ? SecondaryDark : new Color(Danger.r, Danger.g, Danger.b, 0.74f);
                 Color color = timelineIndex == focusedTimelineIndex ? Gold : normal;
-                if (entry.IsCancelled && (entry.WasResolved || battle.Phase == CombatTrainingPhase.Resolving))
-                {
-                    color = new Color(MutedText.r, MutedText.g, MutedText.b, 0.44f);
-                }
 
-                timelineSlotBackgrounds[timelineIndex].color = color;
-                timelineSpeedChipLabels[timelineIndex].text = entry.Initiative == int.MinValue
+                timelineSlotBackgrounds[slotIndex].color = color;
+                timelineSpeedChipLabels[slotIndex].text = entry.Initiative == int.MinValue
                     ? "SPD --"
                     : "SPD " + entry.Initiative;
                 if (ally)
@@ -1492,9 +1661,38 @@ namespace DemonLord.Presentation.Combat
                         + Shorten(intent.DisplayName, 12) + "\n→ " + Shorten(target, 9) + state;
                     timelineSlotLabels[timelineIndex].color = entry.IsCancelled && entry.WasResolved ? MutedText : MainText;
                 }
+
+                // A cancelled/dead action has no visual slot. Copy this surviving action into
+                // the next display slot so the action line closes its gaps immediately.
+                string label = timelineSlotLabels[timelineIndex].text;
+                timelineSlotLabels[slotIndex].text = label.Length > 2
+                    ? (slotIndex + 1).ToString("00") + label.Substring(2)
+                    : label;
+                timelineSlotLabels[slotIndex].color = timelineSlotLabels[timelineIndex].color;
             }
 
             executeButton.interactable = battle.CanExecutePlan;
+        }
+
+        private static bool ShouldDisplayTimelineEntry(CombatTrainingBattle battle, CombatTimelineEntry entry)
+        {
+            if (entry.Side == CombatTimelineSide.Enemy && !battle.IsEnemyAlive(entry.EnemyId))
+            {
+                return false;
+            }
+
+            if (entry.Side == CombatTimelineSide.Ally
+                && entry.HasAllyAction
+                && !battle.IsUnitAlive(CombatTrainingBattle.GetSkillDefinition(entry.AllyAction.SkillId).ActorId))
+            {
+                return false;
+            }
+
+            // Empty planning slots are useful while composing a round. Every other
+            // cancellation is an action whose actor/target can no longer fight, so it
+            // disappears instead of remaining as a dead, muted box.
+            return entry.SkipReason == CombatTimelineSkipReason.None
+                || entry.SkipReason == CombatTimelineSkipReason.EmptySlot;
         }
 
         private void RenderCompactArrows(
@@ -1957,6 +2155,64 @@ namespace DemonLord.Presentation.Combat
                 localPosition.y + compactArrowLayer.rect.height * 0.5f);
         }
 
+        private void AlignCompactBattlefieldToIllustration()
+        {
+            if (lineupImage == null || lineupSprite == null) return;
+
+            for (int index = 0; index < CombatTrainingBattle.UnitCount; index++)
+            {
+                Vector2 actor = GetLineupStagePosition(AllyLineupPoints[index]);
+                Vector2 foot = GetLineupStagePosition(AllyLineupFootPoints[index]);
+                SetCenter(allyFieldAnchors[index], actor, Vector2.zero);
+                SetCenter(allyFieldGlows[index].rectTransform, foot + new Vector2(0f, -8f), new Vector2(76f, 4f));
+                SetCenter(allyFieldLabels[index].rectTransform, foot + new Vector2(0f, -35f), new Vector2(148f, 42f));
+            }
+
+            for (int index = 0; index < CombatTrainingBattle.EnemyCount; index++)
+            {
+                Vector2 actor = GetLineupStagePosition(EnemyLineupPoints[index]);
+                Vector2 foot = GetLineupStagePosition(EnemyLineupFootPoints[index]);
+                Vector2 hitboxSize = GetLineupStageSize(EnemyLineupHitboxSizes[index]);
+                SetCenter(enemyFieldAnchors[index], actor, Vector2.zero);
+                SetCenter(enemyTargetButtons[index].GetComponent<RectTransform>(), actor, hitboxSize);
+                SetCenter(enemyFieldGlows[index].rectTransform, foot + new Vector2(0f, -8f), new Vector2(76f, 4f));
+                SetCenter(enemyFieldLabels[index].rectTransform, foot + new Vector2(0f, -35f), new Vector2(148f, 42f));
+                SetCenter(enemyIntentIconLabels[index].rectTransform, actor + new Vector2(0f, hitboxSize.y * 0.5f + 18f), new Vector2(28f, 24f));
+                SetCenter(enemyIntentLabels[index].rectTransform, actor + new Vector2(0f, hitboxSize.y * 0.5f + 43f), new Vector2(166f, 28f));
+                SetCenter(enemyConditionLabels[index].rectTransform, foot + new Vector2(0f, -61f), new Vector2(148f, 20f));
+            }
+        }
+
+        private Vector2 GetLineupStagePosition(Vector2 normalizedPoint)
+        {
+            RectTransform stage = lineupImage.transform.parent as RectTransform;
+            if (stage == null) return Vector2.zero;
+
+            Vector2 contentSize = GetLineupContentSize();
+            Vector3 worldPoint = lineupImage.rectTransform.TransformPoint(new Vector3(
+                (normalizedPoint.x - 0.5f) * contentSize.x,
+                (normalizedPoint.y - 0.5f) * contentSize.y,
+                0f));
+            Vector3 stagePoint = stage.InverseTransformPoint(worldPoint);
+            return new Vector2(stagePoint.x, stagePoint.y);
+        }
+
+        private Vector2 GetLineupStageSize(Vector2 normalizedSize)
+        {
+            Vector2 contentSize = GetLineupContentSize();
+            return new Vector2(contentSize.x * normalizedSize.x, contentSize.y * normalizedSize.y);
+        }
+
+        private Vector2 GetLineupContentSize()
+        {
+            Rect rect = lineupImage.rectTransform.rect;
+            float sourceAspect = lineupSprite.rect.width / lineupSprite.rect.height;
+            float rectAspect = rect.width / rect.height;
+            return rectAspect > sourceAspect
+                ? new Vector2(rect.height * sourceAspect, rect.height)
+                : new Vector2(rect.width, rect.width / sourceAspect);
+        }
+
         private static RectTransform CreateAnchor(string name, Transform parent, Vector2 position)
         {
             GameObject root = new GameObject(name, typeof(RectTransform));
@@ -2130,6 +2386,11 @@ namespace DemonLord.Presentation.Combat
         private static void SetTopRight(RectTransform rect, Vector2 position, Vector2 size)
         {
             SetAnchoredRect(rect, new Vector2(1f, 1f), new Vector2(1f, 1f), position, size);
+        }
+
+        private static void SetBottomCenter(RectTransform rect, Vector2 position, Vector2 size)
+        {
+            SetAnchoredRect(rect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), position, size);
         }
 
         private static void SetMiddleLeft(RectTransform rect, Vector2 position, Vector2 size)

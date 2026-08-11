@@ -53,15 +53,17 @@ namespace DemonLord.Presentation.Exploration
         public void Show(BattleLaunchRequest request)
         {
             if (request == null || rootGroup == null) return;
-            if (titleLabel != null) titleLabel.text = "현장 출동 준비";
+            ApplyConfirmationLayout();
+            if (titleLabel != null) titleLabel.text = "모의전투를 시작하시겠습니까?";
+            SetButtonLabel(dispatchButton, "시작");
+            SetButtonLabel(closeButton, "그만두기");
             if (detailLabel != null)
             {
-                detailLabel.text = "조정 대상: " + request.EnemyGroupId
-                    + "\n전투 코드: " + request.BattleId
-                    + "\n복귀 위치: " + request.ReturnLocation.AreaId.Value + " / " + request.ReturnLocation.SpawnId.Value;
+                detailLabel.text = "전투 대응 집행관이 준비한 모의전투를 진행합니다."
+                    + "\n전투 화면에서 아군의 기술과 행동 순서를 선택할 수 있습니다.";
             }
 
-            SetStatus("전투 시스템 연결 준비가 완료되었습니다.");
+            SetStatus("시작하면 전투 화면으로 이동합니다.");
             rootGroup.alpha = 1f;
             rootGroup.interactable = true;
             rootGroup.blocksRaycasts = true;
@@ -82,5 +84,33 @@ namespace DemonLord.Presentation.Exploration
 
         private void NotifyDispatch() => DispatchRequested?.Invoke();
         private void NotifyClose() => CloseRequested?.Invoke();
+
+        private static void SetButtonLabel(Button button, string text)
+        {
+            if (button == null) return;
+
+            Text label = button.GetComponentInChildren<Text>(true);
+            if (label != null) label.text = text;
+        }
+
+        private void ApplyConfirmationLayout()
+        {
+            SetCardElementRect(titleLabel?.rectTransform, new Vector2(390f, 402f), new Vector2(680f, 54f));
+            SetCardElementRect(detailLabel?.rectTransform, new Vector2(390f, 286f), new Vector2(650f, 142f));
+            SetCardElementRect(statusLabel?.rectTransform, new Vector2(390f, 132f), new Vector2(660f, 42f));
+            SetCardElementRect(dispatchButton?.GetComponent<RectTransform>(), new Vector2(205f, 60f), new Vector2(270f, 68f));
+            SetCardElementRect(closeButton?.GetComponent<RectTransform>(), new Vector2(575f, 60f), new Vector2(270f, 68f));
+        }
+
+        private static void SetCardElementRect(RectTransform rect, Vector2 position, Vector2 size)
+        {
+            if (rect == null) return;
+
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.zero;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+        }
     }
 }

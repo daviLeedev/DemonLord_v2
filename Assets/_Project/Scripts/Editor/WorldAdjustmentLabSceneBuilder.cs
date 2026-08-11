@@ -401,7 +401,7 @@ namespace DemonLord.Editor
             {
                 CreateDialogueLine(DialogueSpeakerSide.Partner, "세무관님, 조정 대상의 적대 반응이 확인됐습니다."),
                 CreateDialogueLine(DialogueSpeakerSide.Partner, "좌측의 작은 아군 목록에서 대상을 고르면 바로 옆에 그 인원의 기술이 표시됩니다. 붉은 곡선 화살은 적의 공개 행동입니다."),
-                CreateDialogueLine(DialogueSpeakerSide.Partner, "공유 SP 안에서 각자 기술을 고르면 기술 속도에 따라 아군과 적의 행동선이 다시 정렬됩니다. 출동 요청을 누르면 모의전투를 시작합니다."),
+                CreateDialogueLine(DialogueSpeakerSide.Partner, "공유 SP 안에서 각자 기술을 고르면 기술 속도에 따라 아군과 적의 행동선이 다시 정렬됩니다. 대화를 마치면 모의전투를 시작할지 선택할 수 있습니다."),
             };
             sequence.Configure(player, partner, lines);
             EditorUtility.SetDirty(sequence);
@@ -1250,13 +1250,13 @@ namespace DemonLord.Editor
 
             GameObject battleCard = CreateUiPanel("BattlePreparationCard", battleOverlay.transform, new Color(0.055f, 0.065f, 0.085f, 0.985f));
             SetRect(battleCard.GetComponent<RectTransform>(), Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(780f, 460f), Vector2.one * 0.5f);
-            Text battleTitle = CreateText("Title", battleCard.transform, frontendTheme, 36, TextAnchor.MiddleCenter, new Vector2(390f, 405f), new Vector2(680f, 58f));
-            Text battleDetail = CreateText("Detail", battleCard.transform, frontendTheme, 25, TextAnchor.UpperLeft, new Vector2(70f, 320f), new Vector2(640f, 175f));
+            Text battleTitle = CreateText("Title", battleCard.transform, frontendTheme, 36, TextAnchor.MiddleCenter, new Vector2(390f, 402f), new Vector2(680f, 54f));
+            Text battleDetail = CreateText("Detail", battleCard.transform, frontendTheme, 25, TextAnchor.UpperLeft, new Vector2(390f, 286f), new Vector2(650f, 142f));
             battleDetail.fontStyle = FontStyle.Normal;
-            Text battleStatus = CreateText("Status", battleCard.transform, frontendTheme, 21, TextAnchor.MiddleCenter, new Vector2(390f, 128f), new Vector2(660f, 64f));
+            Text battleStatus = CreateText("Status", battleCard.transform, frontendTheme, 21, TextAnchor.MiddleCenter, new Vector2(390f, 132f), new Vector2(660f, 42f));
             battleStatus.color = frontendTheme.MenuSecondary;
-            Button battleDispatchButton = CreatePanelButton("DispatchButton", battleCard.transform, new Vector2(205f, 60f), new Vector2(270f, 68f), "출동 요청", dialogueArt.ChoiceNormal, dialogueArt.ChoiceSelected, frontendTheme);
-            Button battleCloseButton = CreatePanelButton("CloseButton", battleCard.transform, new Vector2(575f, 60f), new Vector2(270f, 68f), "닫기", dialogueArt.Back, dialogueArt.ChoiceSelected, frontendTheme);
+            Button battleDispatchButton = CreatePanelButton("DispatchButton", battleCard.transform, new Vector2(205f, 60f), new Vector2(270f, 68f), "시작", dialogueArt.ChoiceNormal, dialogueArt.ChoiceSelected, frontendTheme);
+            Button battleCloseButton = CreatePanelButton("CloseButton", battleCard.transform, new Vector2(575f, 60f), new Vector2(270f, 68f), "그만두기", dialogueArt.Back, dialogueArt.ChoiceSelected, frontendTheme);
             BattlePreparationView battlePreparationView = battleOverlay.AddComponent<BattlePreparationView>();
             battlePreparationView.Configure(battleGroup, battleTitle, battleDetail, battleStatus, battleDispatchButton, battleCloseButton);
 
